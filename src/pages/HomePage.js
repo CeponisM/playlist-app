@@ -1,193 +1,197 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import Sidebar from '../components/Sidebar';
 import Player from '../components/Player';
 import Playlist from '../components/Playlist';
-import axios from 'axios';
+import { useStore } from '../store';
+import { debounce } from 'lodash';
+import toast from 'react-hot-toast';
 
 const HomePage = () => {
-  const [playlists, setPlaylists] = useState([]);
-  const [currentPlaylistId, setCurrentPlaylistId] = useState(null);
+  const {
+    playlists,
+    setPlaylists,
+    addSong,
+    removeSong,
+    reorderSongs,
+    createPlaylist,
+    removePlaylist,
+    renamePlaylist,
+    reorderPlaylists,
+    currentPlaylistId,
+    setCurrentPlaylistId,
+  } = useStore();
   const [currentSong, setCurrentSong] = useState(null);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [songs, setSongs] = useState([]);
+  const [isRepeat, setIsRepeat] = useState(false);
+  const [isShuffled, setIsShuffled] = useState(false);
+  const [isAutoplay, setIsAutoplay] = useState(true);
+  const [shuffledIndices, setShuffledIndices] = useState([]);
   const playerRef = useRef(null);
+  const songs = playlists.find((p) => p.id === currentPlaylistId)?.songs || [];
 
   useEffect(() => {
-    // Load playlists from local storage and update state
-    const loadedPlaylists = loadPlaylists();
+    const loadedPlaylists = JSON.parse(localStorage.getItem('playlists') || '[]');
     setPlaylists(loadedPlaylists);
-  }, []);
+  }, [setPlaylists]);
 
   useEffect(() => {
-    if (currentPlaylistId) {
-      // Fetch songs in the current playlist here and update state
-      const playlist = playlists.find((p) => p.id === currentPlaylistId);
-      if (playlist) {
-        setSongs(playlist.songs);
-        setCurrentSongIndex(0);
+    if (songs.length === 0) return;
+    const index = isShuffled ? shuffledIndices[currentSongIndex] : currentSongIndex;
+    if (index >= 0 && index < songs.length) {
+      setCurrentSong(songs[index]);
+      if (playerRef.current && songs[index]?.url && songs[index].platform === 'local') {
+        playerRef.current.src = songs[index].url;
+        if (isPlaying && isAutoplay) {
+          playerRef.current.play().catch((err) => {
+            console.error('Autoplay failed:', err);
+            toast.error('Autoplay blocked; please interact with the page');
+          });
+        }
       }
     }
-  }, [currentPlaylistId, playlists]);
+  }, [songs, currentSongIndex, isPlaying, isShuffled, shuffledIndices, isAutoplay]);
 
   useEffect(() => {
-    if (songs.length > 0 && currentSongIndex < songs.length) {
-      // Fetch song details here and update state
-      setCurrentSong(songs[currentSongIndex]);
+    if (isShuffled) {
+      const indices = [...Array(songs.length).keys()];
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+      setShuffledIndices(indices);
+    } else {
+      setShuffledIndices([...Array(songs.length).keys()]);
     }
-  }, [songs, currentSongIndex]);
+  }, [isShuffled, songs.length]);
 
   const handleSelectPlaylist = (playlistId) => {
     setCurrentPlaylistId(playlistId);
+    setCurrentSongIndex(0);
+    setIsPlaying(isAutoplay);
   };
 
   const handlePlayPause = () => {
-    if (playerRef.current.paused) {
-      playerRef.current.play();
+    if (playerRef.current && currentSong.platform === 'local') {
+      if (playerRef.current.paused) {
+        playerRef.current.play().catch((err) => {
+          console.error('Play failed:', err);
+          toast.error('Playback failed; please try again');
+        });
+        setIsPlaying(true);
+      } else {
+        playerRef.current.pause();
+        setIsPlaying(false);
+      }
     } else {
-      playerRef.current.pause();
+      setIsPlaying(!isPlaying); // Toggle for embeds
     }
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleRemoveSong = (id) => {
-    const updatedSongs = songs.filter((song) => song.id !== id);
-    const updatedPlaylists = playlists.map((playlist) => {
-      if (playlist.id === currentPlaylistId) {
-        return { ...playlist, songs: updatedSongs };
-      }
-      return playlist;
-    });
-    setSongs(updatedSongs);
-    setPlaylists(updatedPlaylists);
-    savePlaylists(updatedPlaylists);
-  };
-
-  const handleReorderSongs = (newSongs) => {
-    const updatedPlaylists = playlists.map((playlist) => {
-      if (playlist.id === currentPlaylistId) {
-        return { ...playlist, songs: newSongs };
-      }
-      return playlist;
-    });
-    setSongs(newSongs);
-    setPlaylists(updatedPlaylists);
-    savePlaylists(updatedPlaylists);
-  };
-
-  const handleCreatePlaylist = (playlistName) => {
-    const newPlaylist = { id: Date.now(), name: playlistName, songs: [] };
-    const newPlaylists = [...playlists, newPlaylist];
-    setPlaylists(newPlaylists);
-    savePlaylists(newPlaylists);
-  };
-
-  const handleAddSong = (song) => {
-    console.log(song)
-    const updatedSongs = [...songs, song];
-    const updatedPlaylists = playlists.map((playlist) => {
-      if (playlist.id === currentPlaylistId) {
-        return { ...playlist, songs: updatedSongs };
-      }
-      return playlist;
-    });
-    setSongs(updatedSongs);
-    setPlaylists(updatedPlaylists);
-    savePlaylists(updatedPlaylists);
-    setCurrentSongIndex(updatedSongs.length - 1); // Set the current song index to the new song
   };
 
   const handleNextSong = () => {
-    setCurrentSongIndex((currentSongIndex + 1) % songs.length);
+    if (songs.length === 0) return;
+    let nextIndex;
+    if (isShuffled) {
+      nextIndex = Math.floor(Math.random() * songs.length);
+    } else {
+      nextIndex = currentSongIndex + 1;
+      if (nextIndex >= songs.length) {
+        nextIndex = isRepeat ? 0 : currentSongIndex;
+        if (!isRepeat) setIsPlaying(false);
+      }
+    }
+    setCurrentSongIndex(nextIndex);
+    if (isAutoplay) setIsPlaying(true);
   };
 
   const handlePreviousSong = () => {
-    setCurrentSongIndex((currentSongIndex - 1 + songs.length) % songs.length);
+    if (songs.length === 0) return;
+    let prevIndex = currentSongIndex - 1;
+    if (prevIndex < 0) {
+      prevIndex = isRepeat ? songs.length - 1 : 0;
+      if (!isRepeat) setIsPlaying(false);
+    }
+    setCurrentSongIndex(prevIndex);
+    if (isAutoplay) setIsPlaying(true);
   };
 
   const handleShuffle = () => {
-    const randomIndex = Math.floor(Math.random() * songs.length);
-    setCurrentSongIndex(randomIndex);
+    setIsShuffled(!isShuffled);
+    setCurrentSongIndex(0);
+    if (isAutoplay) setIsPlaying(true);
   };
 
-  // Function to set the current song
+  const handleRepeat = () => {
+    setIsRepeat(!isRepeat);
+  };
+
+  const handleAutoplay = () => {
+    setIsAutoplay(!isAutoplay);
+    if (!isAutoplay && !isPlaying && currentSong?.platform === 'local' && playerRef.current) {
+      playerRef.current.play().catch((err) => {
+        console.error('Autoplay failed:', err);
+        toast.error('Autoplay blocked; please interact with the page');
+      });
+      setIsPlaying(true);
+    }
+  };
+
   const handleSetCurrentSong = (song) => {
-    setCurrentSong(song);
-    const songIndex = songs.findIndex((s) => s.id === song.id);
-    setCurrentSongIndex(songIndex);
-    setIsPlaying(true); // Start playing the new song
-  };
-
-  const loadPlaylists = () => {
-    const playlistsData = localStorage.getItem('playlists');
-    return playlistsData ? JSON.parse(playlistsData) : [];
-  };
-
-  const savePlaylists = (playlistsData) => {
-    localStorage.setItem('playlists', JSON.stringify(playlistsData));
-  };
-
-  const handleRemovePlaylist = (playlistId) => {
-    // Implement the removal logic here
-    // For example, you can filter the playlists array to remove the playlist with the given ID
-    const updatedPlaylists = playlists.filter((playlist) => playlist.id !== playlistId);
-    setPlaylists(updatedPlaylists);
-  };
-
-  const handleReorderPlaylists = (reorderedPlaylists) => {
-    // Implement the reordering logic here
-    setPlaylists(reorderedPlaylists);
-  };
-
-  const handleRenamePlaylist = (playlistId, newName) => {
-    // Implement the renaming logic here
-    // For example, you can map through the playlists array and update the name of the playlist with the given ID
-    const updatedPlaylists = playlists.map((playlist) => {
-      if (playlist.id === playlistId) {
-        return { ...playlist, name: newName };
-      }
-      return playlist;
-    });
-    setPlaylists(updatedPlaylists);
+    const index = songs.findIndex((s) => s.id === song.id);
+    const adjustedIndex = isShuffled ? shuffledIndices.indexOf(index) : index;
+    setCurrentSongIndex(adjustedIndex);
+    if (isAutoplay) setIsPlaying(true);
   };
 
   return (
-    <div>
+    <motion.div
+      className="flex flex-col md:flex-row h-screen overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
       <Sidebar
         playlists={playlists}
-        onRemovePlaylist={handleRemovePlaylist}
-        onReorderPlaylists={handleReorderPlaylists}
-        onRenamePlaylist={handleRenamePlaylist}
+        onRemovePlaylist={removePlaylist}
+        onReorderPlaylists={reorderPlaylists}
+        onRenamePlaylist={renamePlaylist}
         onSelectPlaylist={handleSelectPlaylist}
-        onCreatePlaylist={handleCreatePlaylist}
-        onAddSong={handleAddSong}
+        onCreatePlaylist={createPlaylist}
+        onAddSong={debounce(addSong, 500)}
       />
-      {/* Conditionally render Player */}
-      {songs.length > 0 && songs[currentSongIndex] && (
-        <>
-          <Player
-            playlists={playlists}
-            songs={songs}
-            currentSongIndex={currentSongIndex}
-            setCurrentSongIndex={setCurrentSongIndex}
-            currentSong={currentSong} // Pass the current song
-            isPlaying={isPlaying}
-            onPlayPause={handlePlayPause}
-            onNextSong={handleNextSong}
-            onPreviousSong={handlePreviousSong}
-            onShuffle={handleShuffle}
-          />
-          {/* Render audio element */}
-          <audio ref={playerRef} src={songs[currentSongIndex].url} onEnded={handleNextSong} />
-        </>
-      )}
-      <Playlist
-        songs={songs}
-        onRemoveSong={handleRemoveSong}
-        onReorderSongs={handleReorderSongs}
-        onSongClick={handleSetCurrentSong} // Pass the click handler to Playlist
-      />
-    </div>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {songs.length > 0 && currentSong ? (
+          <>
+            <Player
+              currentSong={currentSong}
+              isPlaying={isPlaying}
+              isRepeat={isRepeat}
+              isShuffled={isShuffled}
+              isAutoplay={isAutoplay}
+              onPlayPause={handlePlayPause}
+              onNextSong={handleNextSong}
+              onPreviousSong={handlePreviousSong}
+              onShuffle={handleShuffle}
+              onRepeat={handleRepeat}
+              onAutoplay={handleAutoplay}
+              playerRef={playerRef}
+            />
+            <Playlist
+              songs={songs}
+              onRemoveSong={removeSong}
+              onReorderSongs={reorderSongs}
+              onSongClick={handleSetCurrentSong}
+            />
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            Select a playlist or add songs
+          </div>
+        )}
+        <audio ref={playerRef} onEnded={handleNextSong} />
+      </div>
+    </motion.div>
   );
 };
 

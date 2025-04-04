@@ -1,208 +1,217 @@
-import React, { useState, useRef } from 'react';
-import styled from 'styled-components';
-import axios from 'axios';
+import React, { useState, useContext } from 'react';
+import { motion } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-
-const SidebarWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  background-color: #f5f5f5;
-`;
-
-const Button = styled.button`
-  margin-bottom: 10px;
-`;
-
-const PlaylistItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid #ddd;
-  background-color: ${(props) => (props.isDragging ? '#f0f0f0' : 'white')};
-  cursor: pointer;
-  transition: background-color 0.2s;
-
-  &:hover {
-    background-color: #e0e0e0;
-  }
-`;
-
-const PlaylistTitle = styled.span`
-  margin-right: 10px;
-  cursor: pointer; /* Add cursor style to indicate it's clickable */
-`;
-
-const RenamePlaylistInput = styled.input`
-  border: none;
-  outline: none;
-  font-size: inherit;
-  padding: 0;
-  margin: 0;
-`;
-
-// spotify
-const fetchAccessToken = async () => {
-  const clientId = '179fef3b474847f78013eb58a75ba6b9';
-  const clientSecret = '6e5616c73b6e4e3b85db6f375c1f4584';
-  
-  try {
-    const response = await axios.post('https://accounts.spotify.com/api/token', null, {
-      params: {
-        grant_type: 'client_credentials'
-      },
-      auth: {
-        username: clientId,
-        password: clientSecret
-      }
-    });
-
-    return response.data.access_token;
-  } catch (error) {
-    console.error('Failed to obtain access token:', error);
-    throw error;
-  }
-};
-
-const fetchSongDetails = async (songUrl) => {
-  let platform;
-  let id;
-  
-  if (songUrl.includes('youtube.com')) {
-    platform = 'youtube';
-    id = songUrl.split('v=')[1];
-    const response = await axios.get(`https://www.googleapis.com/youtube/v3/videos?id=${id}&key=AIzaSyCtr1tKLPbZuALc4P5gQpWXYW3fju8lXJQ&part=snippet`);
-    const item = response.data.items[0];
-    return {
-      id: item.id,
-      title: item.snippet.title,
-      artist: item.snippet.channelTitle,
-      thumbnail: item.snippet.thumbnails.default.url,
-      platform,
-    };
-  } else if (songUrl.includes('spotify.com')) {
-    platform = 'spotify';
-    id = songUrl.split('track/')[1];
-
-    try {
-      // Obtain the access token
-      const accessToken = await fetchAccessToken();
-
-      const response = await axios.get(`https://api.spotify.com/v1/tracks/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-
-      return {
-        id: response.data.id,
-        title: response.data.name,
-        artist: response.data.artists[0].name,
-        album: response.data.album.name,
-        thumbnail: response.data.album.images[0].url,
-        platform,
-      };
-    } catch (error) {
-      console.error('Failed to add song:', error);
-      throw error;
-    }
-  } else if (songUrl.includes('soundcloud.com')) {
-    platform = 'soundcloud';
-    // Extracting ID for SoundCloud is not straightforward
-    // You would need to use SoundCloud's resolve endpoint to get the track's ID
-  } else {
-    throw new Error('Unsupported music platform');
-  }
-};
+import { ThemeContext } from '../context/ThemeContext';
+import { parseBlob } from 'music-metadata-browser';
+import toast from 'react-hot-toast';
 
 const Sidebar = ({ playlists, onSelectPlaylist, onCreatePlaylist, onAddSong, onRemovePlaylist, onRenamePlaylist, onReorderPlaylists }) => {
+  const { theme, setTheme } = useContext(ThemeContext);
   const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [songUrl, setSongUrl] = useState('');
   const [isRenaming, setIsRenaming] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [urlInput, setUrlInput] = useState('');
 
-  const handleInputChange = (event) => {
-    setNewPlaylistName(event.target.value);
+  const handleCreatePlaylist = (e) => {
+    e.preventDefault();
+    if (newPlaylistName.trim()) {
+      onCreatePlaylist(newPlaylistName);
+      setNewPlaylistName('');
+    }
   };
 
-  const handleFormSubmit = (event) => {
-    event.preventDefault();
-    onCreatePlaylist(newPlaylistName);
-    setNewPlaylistName('');
+  const handleAddLocalSong = async (e) => {
+    e.preventDefault();
+    const file = e.target.files?.[0];
+    if (file && file.type === 'audio/mp3') {
+      const url = URL.createObjectURL(file);
+      try {
+        const metadata = await parseBlob(file);
+        const picture = metadata.common.picture?.[0];
+        const song = {
+          id: Date.now(),
+          title: metadata.common.title || file.name,
+          artist: metadata.common.artist || 'Unknown Artist',
+          album: metadata.common.album || 'Unknown Album',
+          thumbnail: picture
+            ? `data:${picture.format};base64,${Buffer.from(picture.data).toString('base64')}`
+            : 'https://via.placeholder.com/50',
+          url,
+          platform: 'local',
+        };
+        onAddSong(song);
+        toast.success('Song added successfully');
+      } catch (error) {
+        console.error('Metadata read error:', error);
+        toast.error('Failed to read metadata; using default values');
+        const song = {
+          id: Date.now(),
+          title: file.name,
+          artist: 'Unknown Artist',
+          album: 'Unknown Album',
+          thumbnail: 'https://via.placeholder.com/50',
+          url,
+          platform: 'local',
+        };
+        onAddSong(song);
+      }
+    } else {
+      toast.error('Please upload an MP3 file');
+    }
   };
 
-  const handleSongUrlChange = (event) => {
-    setSongUrl(event.target.value);
-  };
+  const handleAddUrl = async (e) => {
+    e.preventDefault();
+    if (!urlInput) return;
+    let song = { id: Date.now(), platform: 'unknown' };
 
-  const handleAddSongSubmit = async (event) => {
-    event.preventDefault();
     try {
-      const songDetails = await fetchSongDetails(songUrl);
-      onAddSong(songDetails);
-      setSongUrl('');
+      if (urlInput.includes('youtube.com') || urlInput.includes('youtu.be')) {
+        // YouTube: Use iframe embed
+        const videoId = urlInput.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+        if (!videoId) throw new Error('Invalid YouTube URL');
+        song = {
+          id: Date.now(),
+          title: 'YouTube Video',
+          artist: 'Unknown Artist',
+          album: 'YouTube',
+          thumbnail: `https://img.youtube.com/vi/${videoId}/default.jpg`,
+          url: `https://www.youtube.com/embed/${videoId}?autoplay=1`,
+          platform: 'youtube',
+        };
+      } else if (urlInput.includes('soundcloud.com')) {
+        // SoundCloud: Use oEmbed
+        const response = await fetch(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(urlInput)}`);
+        const data = await response.json();
+        song = {
+          id: Date.now(),
+          title: data.title || 'SoundCloud Track',
+          artist: data.author_name || 'Unknown Artist',
+          album: 'SoundCloud',
+          thumbnail: data.thumbnail_url || 'https://via.placeholder.com/50',
+          url: data.html.match(/src="([^"]+)"/)?.[1] || urlInput,
+          platform: 'soundcloud',
+        };
+      } else if (urlInput.includes('spotify.com')) {
+        // Spotify: Use oEmbed
+        const response = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(urlInput)}`);
+        const data = await response.json();
+        song = {
+          id: Date.now(),
+          title: data.title || 'Spotify Track',
+          artist: data.author_name || 'Unknown Artist',
+          album: 'Spotify',
+          thumbnail: data.thumbnail_url || 'https://via.placeholder.com/50',
+          url: data.html.match(/src="([^"]+)"/)?.[1] || urlInput,
+          platform: 'spotify',
+        };
+      } else if (urlInput.includes('yandex')) {
+        // Yandex: Limited public data; use manual metadata
+        song = {
+          id: Date.now(),
+          title: 'Yandex Track',
+          artist: 'Unknown Artist',
+          album: 'Yandex',
+          thumbnail: 'https://via.placeholder.com/50',
+          url: urlInput,
+          platform: 'yandex',
+        };
+      } else {
+        throw new Error('Unsupported URL');
+      }
+      onAddSong(song);
+      toast.success('Content added successfully');
+      setUrlInput('');
     } catch (error) {
-      console.error('Failed to add song:', error);
+      console.error('URL processing error:', error);
+      toast.error('Failed to add URL; please check the link');
     }
   };
 
-  const handleRemovePlaylist = (playlistId) => {
-    if (window.confirm('Are you sure you want to remove this playlist?')) {
-      onRemovePlaylist(playlistId);
-    }
-  };
-
-  const handleRenamePlaylist = (playlistId, newName) => {
-    onRenamePlaylist(playlistId, newName);
-    setIsRenaming(null);
-  };
-
-  const handleReorder = (result) => {
+  const handleDragEnd = (result) => {
     if (!result.destination) return;
-
     const reorderedPlaylists = Array.from(playlists);
     const [removed] = reorderedPlaylists.splice(result.source.index, 1);
     reorderedPlaylists.splice(result.destination.index, 0, removed);
-
     onReorderPlaylists(reorderedPlaylists);
   };
 
+  const filteredPlaylists = playlists.filter((p) =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <SidebarWrapper>
-      <DragDropContext onDragEnd={handleReorder}>
-        <Droppable droppableId="playlists" type="PLAYLIST">
+    <motion.div
+      className={`w-full md:w-80 p-4 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} overflow-y-auto`}
+      initial={{ x: -100 }}
+      animate={{ x: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Playlists</h2>
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="p-2 rounded-full bg-gray-300 dark:bg-gray-700"
+          aria-label="Toggle theme"
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+      </div>
+      <input
+        type="text"
+        placeholder="Search playlists..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full p-2 mb-4 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+        aria-label="Search playlists"
+      />
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="playlists">
           {(provided) => (
             <div {...provided.droppableProps} ref={provided.innerRef}>
-              {playlists.map((playlist, index) => (
-                <Draggable key={playlist.id.toString()} draggableId={playlist.id.toString()} index={index}>
+              {filteredPlaylists.map((playlist, index) => (
+                <Draggable key={playlist.id} draggableId={playlist.id.toString()} index={index}>
                   {(provided, snapshot) => (
-                    <PlaylistItem
+                    <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
                       {...provided.dragHandleProps}
-                      isDragging={snapshot.isDragging}
+                      className={`flex justify-between items-center p-3 mb-2 rounded ${
+                        snapshot.isDragging ? 'bg-gray-300 dark:bg-gray-600' : 'bg-white dark:bg-gray-700'
+                      } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
                       onClick={() => onSelectPlaylist(playlist.id)}
+                      aria-label={`Select playlist ${playlist.name}`}
                     >
                       {isRenaming === playlist.id ? (
-                        <>
-                          <RenamePlaylistInput
-                            type="text"
-                            value={playlist.name}
-                            onChange={(e) => handleRenamePlaylist(playlist.id, e.target.value)}
-                            onBlur={() => setIsRenaming(null)}
-                            autoFocus
-                          />
-                        </>
+                        <input
+                          type="text"
+                          value={playlist.name}
+                          onChange={(e) => onRenamePlaylist(playlist.id, e.target.value)}
+                          onBlur={() => setIsRenaming(null)}
+                          autoFocus
+                          className="flex-1 bg-transparent border-none outline-none"
+                          aria-label={`Rename playlist ${playlist.name}`}
+                        />
                       ) : (
-                        <>
-                          <PlaylistTitle>
-                            {playlist.name}
-                          </PlaylistTitle>
-                          <Button onClick={() => setIsRenaming(playlist.id)}>Rename</Button>
-                        </>
+                        <span>{playlist.name}</span>
                       )}
-                      <Button onClick={() => handleRemovePlaylist(playlist.id)}>Remove</Button>
-                    </PlaylistItem>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => setIsRenaming(playlist.id)}
+                          className="text-sm"
+                          aria-label={`Rename playlist ${playlist.name}`}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          onClick={() => onRemovePlaylist(playlist.id)}
+                          className="text-sm text-red-500"
+                          aria-label={`Remove playlist ${playlist.name}`}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </Draggable>
               ))}
@@ -211,20 +220,58 @@ const Sidebar = ({ playlists, onSelectPlaylist, onCreatePlaylist, onAddSong, onR
           )}
         </Droppable>
       </DragDropContext>
-      <form onSubmit={handleFormSubmit}>
-        <input type="text" value={newPlaylistName} onChange={handleInputChange} />
-        <Button type="submit">Create Playlist</Button>
-      </form>
-      <form onSubmit={handleAddSongSubmit}>
+      <form onSubmit={handleCreatePlaylist} className="mt-4">
         <input
           type="text"
-          value={songUrl}
-          onChange={(e) => setSongUrl(e.target.value)}
-          placeholder="Song URL"
+          value={newPlaylistName}
+          onChange={(e) => setNewPlaylistName(e.target.value)}
+          placeholder="New Playlist"
+          className="w-full p-2 mb-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+          aria-label="New playlist name"
         />
-        <Button type="submit">Add Song</Button>
+        <button
+          type="submit"
+          className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          aria-label="Create playlist"
+        >
+          Create Playlist
+        </button>
       </form>
-    </SidebarWrapper>
+      <div className="mt-4">
+        <label className="block mb-2" htmlFor="file-upload">
+          Upload Local MP3
+        </label>
+        <input
+          id="file-upload"
+          type="file"
+          accept="audio/mp3"
+          onChange={handleAddLocalSong}
+          className="w-full p-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+          aria-label="Upload MP3 file"
+        />
+      </div>
+      <form onSubmit={handleAddUrl} className="mt-4">
+        <label className="block mb-2" htmlFor="url-input">
+          Add YouTube/Spotify/SoundCloud/Yandex URL
+        </label>
+        <input
+          id="url-input"
+          type="text"
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          placeholder="Paste URL here"
+          className="w-full p-2 mb-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+          aria-label="Add media URL"
+        />
+        <button
+          type="submit"
+          className="w-full p-2 bg-green-500 text-white rounded hover:bg-green-600"
+          aria-label="Add URL"
+        >
+          Add URL
+        </button>
+      </form>
+    </motion.div>
   );
 };
 

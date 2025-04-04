@@ -1,84 +1,86 @@
 import React from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-import styled from 'styled-components';
-
-const Song = styled.div.attrs(props => ({
-  style: {
-    backgroundColor: props.isDragging ? '#f0f0f0' : 'white',
-  },
-}))`
-  display: flex;
-  align-items: center;
-  padding: 10px;
-  border-bottom: 1px solid #ddd;
-  cursor: pointer;
-  transition: background-color 0.2s;
-`;
-
-const Thumbnail = styled.img`
-  width: 50px;
-  height: 50px;
-  margin-right: 10px;
-`;
-
-const Title = styled.h2`
-  margin: 0;
-`;
-
-const Artist = styled.p`
-  margin: 0;
-`;
-
-const Album = styled.p`
-  margin: 0;
-`;
-
-const RemoveButton = styled.button`
-  margin-left: auto;
-`;
+import { motion } from 'framer-motion';
+import { useContext } from 'react';
+import { ThemeContext } from '../context/ThemeContext';
+import toast from 'react-hot-toast';
 
 const Playlist = ({ songs, onRemoveSong, onReorderSongs, onSongClick }) => {
+  const { theme } = useContext(ThemeContext);
+
   const handleDragEnd = (result) => {
     if (!result.destination) return;
-
-    const reorderedSongs = Array.from(songs);
-    const [removed] = reorderedSongs.splice(result.source.index, 1);
-    reorderedSongs.splice(result.destination.index, 0, removed);
-
-    onReorderSongs(reorderedSongs);
+    try {
+      const reorderedSongs = Array.from(songs);
+      const [removed] = reorderedSongs.splice(result.source.index, 1);
+      reorderedSongs.splice(result.destination.index, 0, removed);
+      onReorderSongs(reorderedSongs);
+      toast.success('Playlist reordered');
+    } catch (error) {
+      console.error('Reordering failed:', error);
+      toast.error('Failed to reorder playlist');
+    }
   };
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
-      <Droppable droppableId="playlist">
-        {(provided) => (
-          <div {...provided.droppableProps} ref={provided.innerRef}>
-            {songs.map((song, index) => (
-              <Draggable key={song.id} draggableId={song.id} index={index}>
-                {(provided, snapshot) => (
-                  <Song
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                    onClick={() => onSongClick(song)}
-                    isDragging={snapshot.isDragging}
-                  >
-                    <Thumbnail src={song.thumbnail} alt={song.title} />
-                    <div>
-                      <Title>{song.title}</Title>
-                      <Artist>{song.artist}</Artist>
-                      <Album>{song.album}</Album>
-                    </div>
-                    <RemoveButton onClick={() => onRemoveSong(song.id)}>Remove</RemoveButton>
-                  </Song>
-                )}
-              </Draggable>
-            ))}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
-    </DragDropContext>
+    <motion.div
+      className="flex-1 overflow-y-auto p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="playlist">
+          {(provided) => (
+            <div {...provided.droppableProps} ref={provided.innerRef}>
+              {songs.map((song, index) => (
+                <Draggable key={song.id} draggableId={song.id.toString()} index={index}>
+                  {(provided, snapshot) => (
+                    <motion.div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      {...provided.dragHandleProps}
+                      className={`flex items-center p-3 mb-2 rounded ${
+                        snapshot.isDragging ? 'bg-gray-300 dark:bg-gray-600' : 'bg-white dark:bg-gray-700'
+                      } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
+                      onClick={() => onSongClick(song)}
+                      whileHover={{ scale: 1.02 }}
+                      aria-label={`Play ${song.title}`}
+                    >
+                      <img
+                        src={song.thumbnail}
+                        alt={song.title}
+                        className="w-12 h-12 mr-4 rounded"
+                        loading="lazy"
+                      />
+                      <div className="flex-1">
+                        <h3 className="font-semibold">{song.title}</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{song.artist}</p>
+                        {song.album && (
+                          <p className="text-sm text-gray-500 dark:text-gray-500">{song.album}</p>
+                        )}
+                        <p className="text-sm text-gray-500 dark:text-gray-500">{song.platform}</p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveSong(song.id);
+                        }}
+                        className="text-red-500 hover:text-red-700"
+                        aria-label={`Remove ${song.title}`}
+                      >
+                        Remove
+                      </button>
+                    </motion.div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
+    </motion.div>
   );
 };
 
