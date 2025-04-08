@@ -9,11 +9,15 @@ const Playlist = ({ songs, onRemoveSong, onReorderSongs, onSongClick }) => {
   const { theme } = useContext(ThemeContext);
 
   const handleDragEnd = (result) => {
-    if (!result.destination) return;
+    if (!result.destination) {
+      console.log('No destination for drag');
+      return;
+    }
     try {
       const reorderedSongs = Array.from(songs);
       const [removed] = reorderedSongs.splice(result.source.index, 1);
       reorderedSongs.splice(result.destination.index, 0, removed);
+      console.log('Reordering songs:', { source: result.source.index, destination: result.destination.index, reorderedSongs });
       onReorderSongs(reorderedSongs);
       toast.success('Playlist reordered');
     } catch (error) {
@@ -24,15 +28,19 @@ const Playlist = ({ songs, onRemoveSong, onReorderSongs, onSongClick }) => {
 
   return (
     <motion.div
-      className="flex-1 overflow-y-auto p-4"
+      className="flex-1 overflow-y-auto p-4 pb-20" // Added padding-bottom to avoid control overlap
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="playlist">
-          {(provided) => (
-            <div {...provided.droppableProps} ref={provided.innerRef}>
+          {(provided, snapshot) => (
+            <div
+              {...provided.droppableProps}
+              ref={provided.innerRef}
+              className={`min-h-[100px] ${snapshot.isDraggingOver ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
+            >
               {songs.map((song, index) => (
                 <Draggable key={song.id} draggableId={song.id.toString()} index={index}>
                   {(provided, snapshot) => (
@@ -41,8 +49,8 @@ const Playlist = ({ songs, onRemoveSong, onReorderSongs, onSongClick }) => {
                       {...provided.draggableProps}
                       {...provided.dragHandleProps}
                       className={`flex items-center p-3 mb-2 rounded ${
-                        snapshot.isDragging ? 'bg-gray-300 dark:bg-gray-600' : 'bg-white dark:bg-gray-700'
-                      } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
+                        snapshot.isDragging ? 'bg-gray-300 dark:bg-gray-600 shadow-lg' : 'bg-white dark:bg-gray-700'
+                      } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer z-0`} // Lower z-index
                       onClick={() => onSongClick(song)}
                       whileHover={{ scale: 1.02 }}
                       aria-label={`Play ${song.title}`}

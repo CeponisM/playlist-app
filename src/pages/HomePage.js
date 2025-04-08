@@ -159,6 +159,7 @@ const HomePage = () => {
         onSelectPlaylist={handleSelectPlaylist}
         onCreatePlaylist={createPlaylist}
         onAddSong={debounce(addSong, 500)}
+        currentPlaylistId={currentPlaylistId}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         {songs.length > 0 && currentSong ? (

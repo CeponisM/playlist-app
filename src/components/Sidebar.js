@@ -5,7 +5,16 @@ import { ThemeContext } from '../context/ThemeContext';
 import { parseBlob } from 'music-metadata-browser';
 import toast from 'react-hot-toast';
 
-const Sidebar = ({ playlists, onSelectPlaylist, onCreatePlaylist, onAddSong, onRemovePlaylist, onRenamePlaylist, onReorderPlaylists }) => {
+const Sidebar = ({
+  playlists,
+  onSelectPlaylist,
+  onCreatePlaylist,
+  onAddSong,
+  onRemovePlaylist,
+  onRenamePlaylist,
+  onReorderPlaylists,
+  currentPlaylistId,
+}) => {
   const { theme, setTheme } = useContext(ThemeContext);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [isRenaming, setIsRenaming] = useState(null);
@@ -67,7 +76,6 @@ const Sidebar = ({ playlists, onSelectPlaylist, onCreatePlaylist, onAddSong, onR
 
     try {
       if (urlInput.includes('youtube.com') || urlInput.includes('youtu.be')) {
-        // YouTube: Use iframe embed
         const videoId = urlInput.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
         if (!videoId) throw new Error('Invalid YouTube URL');
         song = {
@@ -80,7 +88,6 @@ const Sidebar = ({ playlists, onSelectPlaylist, onCreatePlaylist, onAddSong, onR
           platform: 'youtube',
         };
       } else if (urlInput.includes('soundcloud.com')) {
-        // SoundCloud: Use oEmbed
         const response = await fetch(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(urlInput)}`);
         const data = await response.json();
         song = {
@@ -93,7 +100,6 @@ const Sidebar = ({ playlists, onSelectPlaylist, onCreatePlaylist, onAddSong, onR
           platform: 'soundcloud',
         };
       } else if (urlInput.includes('spotify.com')) {
-        // Spotify: Use oEmbed
         const response = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(urlInput)}`);
         const data = await response.json();
         song = {
@@ -106,7 +112,6 @@ const Sidebar = ({ playlists, onSelectPlaylist, onCreatePlaylist, onAddSong, onR
           platform: 'spotify',
         };
       } else if (urlInput.includes('yandex')) {
-        // Yandex: Limited public data; use manual metadata
         song = {
           id: Date.now(),
           title: 'Yandex Track',
@@ -147,6 +152,7 @@ const Sidebar = ({ playlists, onSelectPlaylist, onCreatePlaylist, onAddSong, onR
       animate={{ x: 0 }}
       transition={{ duration: 0.3 }}
     >
+      {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Playlists</h2>
         <button
@@ -165,112 +171,133 @@ const Sidebar = ({ playlists, onSelectPlaylist, onCreatePlaylist, onAddSong, onR
         className="w-full p-2 mb-4 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
         aria-label="Search playlists"
       />
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="playlists">
-          {(provided) => (
-            <div {...provided.droppableProps} ref={provided.innerRef}>
-              {filteredPlaylists.map((playlist, index) => (
-                <Draggable key={playlist.id} draggableId={playlist.id.toString()} index={index}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      className={`flex justify-between items-center p-3 mb-2 rounded ${
-                        snapshot.isDragging ? 'bg-gray-300 dark:bg-gray-600' : 'bg-white dark:bg-gray-700'
-                      } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
-                      onClick={() => onSelectPlaylist(playlist.id)}
-                      aria-label={`Select playlist ${playlist.name}`}
-                    >
-                      {isRenaming === playlist.id ? (
-                        <input
-                          type="text"
-                          value={playlist.name}
-                          onChange={(e) => onRenamePlaylist(playlist.id, e.target.value)}
-                          onBlur={() => setIsRenaming(null)}
-                          autoFocus
-                          className="flex-1 bg-transparent border-none outline-none"
-                          aria-label={`Rename playlist ${playlist.name}`}
-                        />
-                      ) : (
-                        <span>{playlist.name}</span>
-                      )}
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => setIsRenaming(playlist.id)}
-                          className="text-sm"
-                          aria-label={`Rename playlist ${playlist.name}`}
-                        >
-                          Rename
-                        </button>
-                        <button
-                          onClick={() => onRemovePlaylist(playlist.id)}
-                          className="text-sm text-red-500"
-                          aria-label={`Remove playlist ${playlist.name}`}
-                        >
-                          Remove
-                        </button>
+      {/* Playlist Section */}
+      <div className="mb-6 p-4 rounded-lg shadow-md bg-gray-700 dark:bg-gray-900">
+        <h3 className="text-lg font-semibold mb-2">Your Playlists</h3>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="playlists">
+            {(provided) => (
+              <div {...provided.droppableProps} ref={provided.innerRef}>
+                {filteredPlaylists.map((playlist, index) => (
+                  <Draggable key={playlist.id} draggableId={playlist.id.toString()} index={index}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        className={`flex justify-between items-center p-3 mb-2 rounded ${
+                          currentPlaylistId === playlist.id
+                            ? 'bg-blue-500 text-white'
+                            : snapshot.isDragging
+                            ? 'bg-gray-300 dark:bg-gray-600'
+                            : 'bg-white dark:bg-gray-700'
+                        } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
+                        onClick={() => onSelectPlaylist(playlist.id)}
+                        aria-label={`Select playlist ${playlist.name}`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          {currentPlaylistId === playlist.id && (
+                            <span className="text-blue-300">▶</span>
+                          )}
+                          {isRenaming === playlist.id ? (
+                            <input
+                              type="text"
+                              value={playlist.name}
+                              onChange={(e) => onRenamePlaylist(playlist.id, e.target.value)}
+                              onBlur={() => setIsRenaming(null)}
+                              autoFocus
+                              className={`flex-1 bg-transparent border-none outline-none ${
+                                currentPlaylistId === playlist.id ? 'text-white' : ''
+                              }`}
+                              aria-label={`Rename playlist ${playlist.name}`}
+                            />
+                          ) : (
+                            <span>{playlist.name}</span>
+                          )}
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setIsRenaming(playlist.id)}
+                            className="text-sm"
+                            aria-label={`Rename playlist ${playlist.name}`}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            onClick={() => onRemovePlaylist(playlist.id)}
+                            className="text-sm text-red-500"
+                            aria-label={`Remove playlist ${playlist.name}`}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
-      <form onSubmit={handleCreatePlaylist} className="mt-4">
-        <input
-          type="text"
-          value={newPlaylistName}
-          onChange={(e) => setNewPlaylistName(e.target.value)}
-          placeholder="New Playlist"
-          className="w-full p-2 mb-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
-          aria-label="New playlist name"
-        />
-        <button
-          type="submit"
-          className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          aria-label="Create playlist"
-        >
-          Create Playlist
-        </button>
-      </form>
-      <div className="mt-4">
-        <label className="block mb-2" htmlFor="file-upload">
-          Upload Local MP3
-        </label>
-        <input
-          id="file-upload"
-          type="file"
-          accept="audio/mp3"
-          onChange={handleAddLocalSong}
-          className="w-full p-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
-          aria-label="Upload MP3 file"
-        />
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+        <form onSubmit={handleCreatePlaylist}>
+          <input
+            type="text"
+            value={newPlaylistName}
+            onChange={(e) => setNewPlaylistName(e.target.value)}
+            placeholder="New Playlist"
+            className="w-full p-2 mb-2 rounded bg-gray-600 dark:bg-gray-800 text-gray-300 dark:text-gray-200"
+            aria-label="New playlist name"
+          />
+          <button
+            type="submit"
+            className="w-full p-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white"
+            aria-label="Create playlist"
+          >
+            Create Playlist
+          </button>
+        </form>
       </div>
-      <form onSubmit={handleAddUrl} className="mt-4">
-        <label className="block mb-2" htmlFor="url-input">
-          Add YouTube/Spotify/SoundCloud/Yandex URL
-        </label>
-        <input
-          id="url-input"
-          type="text"
-          value={urlInput}
-          onChange={(e) => setUrlInput(e.target.value)}
-          placeholder="Paste URL here"
-          className="w-full p-2 mb-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
-          aria-label="Add media URL"
-        />
-        <button
-          type="submit"
-          className="w-full p-2 bg-green-500 text-white rounded hover:bg-green-600"
-          aria-label="Add URL"
-        >
-          Add URL
-        </button>
-      </form>
+      {/* Add Media Section */}
+      <div className="p-4 rounded-lg shadow-lg bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700">
+        <h3 className="text-lg font-semibold mb-4 text-blue-700 dark:text-blue-400">Add Media</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2" htmlFor="file-upload">
+              Upload Local MP3
+            </label>
+            <input
+              id="file-upload"
+              type="file"
+              accept="audio/mp3"
+              onChange={handleAddLocalSong}
+              className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600"
+              aria-label="Upload MP3 file"
+            />
+          </div>
+          <form onSubmit={handleAddUrl}>
+            <label className="block text-sm font-medium mb-2" htmlFor="url-input">
+              Add YouTube, Spotify, SoundCloud, or Yandex URL
+            </label>
+            <input
+              id="url-input"
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="Paste URL here..."
+              className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600"
+              aria-label="Add media URL"
+            />
+            <button
+              type="submit"
+              className="w-full p-2 rounded-md mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+              aria-label="Add URL"
+            >
+              Add Media
+            </button>
+          </form>
+        </div>
+      </div>
     </motion.div>
   );
 };
