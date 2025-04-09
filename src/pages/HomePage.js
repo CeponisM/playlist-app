@@ -37,8 +37,11 @@ const HomePage = () => {
   }, [setPlaylists]);
 
   useEffect(() => {
-    if (songs.length === 0) return;
-    const index = isShuffled ? shuffledIndices[currentSongIndex] : currentSongIndex;
+    if (songs.length === 0) {
+      setCurrentSong(null);
+      return;
+    }
+    const index = isShuffled ? shuffledIndices[currentSongIndex] || currentSongIndex : currentSongIndex;
     if (index >= 0 && index < songs.length) {
       setCurrentSong(songs[index]);
       if (playerRef.current && songs[index]?.url && songs[index].platform === 'local') {
@@ -54,7 +57,7 @@ const HomePage = () => {
   }, [songs, currentSongIndex, isPlaying, isShuffled, shuffledIndices, isAutoplay]);
 
   useEffect(() => {
-    if (isShuffled) {
+    if (isShuffled && songs.length > 0) {
       const indices = [...Array(songs.length).keys()];
       for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -69,57 +72,73 @@ const HomePage = () => {
   const handleSelectPlaylist = (playlistId) => {
     setCurrentPlaylistId(playlistId);
     setCurrentSongIndex(0);
-    setIsPlaying(isAutoplay);
+    setIsPlaying(false); // Reset playing state when switching playlists
   };
 
-  const handlePlayPause = () => {
-    if (playerRef.current && currentSong.platform === 'local') {
-      if (playerRef.current.paused) {
-        playerRef.current.play().catch((err) => {
-          console.error('Play failed:', err);
-          toast.error('Playback failed; please try again');
-        });
-        setIsPlaying(true);
-      } else {
-        playerRef.current.pause();
-        setIsPlaying(false);
-      }
-    } else {
-      setIsPlaying(!isPlaying); // Toggle for embeds
-    }
+  const handlePlayPause = (playing) => {
+    setIsPlaying(playing);
   };
 
   const handleNextSong = () => {
     if (songs.length === 0) return;
     let nextIndex;
     if (isShuffled) {
-      nextIndex = Math.floor(Math.random() * songs.length);
+      const currentShuffledIndex = shuffledIndices.indexOf(currentSongIndex);
+      nextIndex = currentShuffledIndex + 1;
+      if (nextIndex >= shuffledIndices.length) {
+        nextIndex = isRepeat ? 0 : currentShuffledIndex;
+        if (!isRepeat) {
+          setIsPlaying(false);
+          return;
+        }
+      }
+      setCurrentSongIndex(shuffledIndices[nextIndex]);
     } else {
       nextIndex = currentSongIndex + 1;
       if (nextIndex >= songs.length) {
         nextIndex = isRepeat ? 0 : currentSongIndex;
-        if (!isRepeat) setIsPlaying(false);
+        if (!isRepeat) {
+          setIsPlaying(false);
+          return;
+        }
       }
+      setCurrentSongIndex(nextIndex);
     }
-    setCurrentSongIndex(nextIndex);
     if (isAutoplay) setIsPlaying(true);
   };
 
   const handlePreviousSong = () => {
     if (songs.length === 0) return;
-    let prevIndex = currentSongIndex - 1;
-    if (prevIndex < 0) {
-      prevIndex = isRepeat ? songs.length - 1 : 0;
-      if (!isRepeat) setIsPlaying(false);
+    let prevIndex;
+    if (isShuffled) {
+      const currentShuffledIndex = shuffledIndices.indexOf(currentSongIndex);
+      prevIndex = currentShuffledIndex - 1;
+      if (prevIndex < 0) {
+        prevIndex = isRepeat ? shuffledIndices.length - 1 : 0;
+        if (!isRepeat) {
+          setIsPlaying(false);
+          return;
+        }
+      }
+      setCurrentSongIndex(shuffledIndices[prevIndex]);
+    } else {
+      prevIndex = currentSongIndex - 1;
+      if (prevIndex < 0) {
+        prevIndex = isRepeat ? songs.length - 1 : 0;
+        if (!isRepeat) {
+          setIsPlaying(false);
+          return;
+        }
+      }
+      setCurrentSongIndex(prevIndex);
     }
-    setCurrentSongIndex(prevIndex);
     if (isAutoplay) setIsPlaying(true);
   };
 
   const handleShuffle = () => {
     setIsShuffled(!isShuffled);
-    setCurrentSongIndex(0);
-    if (isAutoplay) setIsPlaying(true);
+    // Don't reset the current song index when toggling shuffle
+    if (isAutoplay && currentSong) setIsPlaying(true);
   };
 
   const handleRepeat = () => {
@@ -139,9 +158,58 @@ const HomePage = () => {
 
   const handleSetCurrentSong = (song) => {
     const index = songs.findIndex((s) => s.id === song.id);
-    const adjustedIndex = isShuffled ? shuffledIndices.indexOf(index) : index;
-    setCurrentSongIndex(adjustedIndex);
-    if (isAutoplay) setIsPlaying(true);
+    if (index !== -1) {
+      setCurrentSongIndex(index);
+      if (isAutoplay) setIsPlaying(true);
+    }
+  };
+
+  const handleReorderSongs = (reorderedSongs, dragResult) => {
+    // Update the songs in the store
+    reorderSongs(reorderedSongs);
+    
+    // Update the current song index if the current song was moved
+    if (currentSong) {
+      const newIndex = reorderedSongs.findIndex(song => song.id === currentSong.id);
+      if (newIndex !== -1) {
+        setCurrentSongIndex(newIndex);
+      }
+    }
+    
+    // If shuffle is enabled, regenerate shuffled indices
+    if (isShuffled) {
+      const indices = [...Array(reorderedSongs.length).keys()];
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+      setShuffledIndices(indices);
+    }
+  };
+
+  const handleRemoveSong = (songId) => {
+    const songIndex = songs.findIndex(song => song.id === songId);
+    const isCurrentSong = currentSong && currentSong.id === songId;
+    
+    removeSong(songId);
+    
+    if (isCurrentSong) {
+      // If removing the current song, move to the next one or stop playing
+      if (songs.length > 1) {
+        let nextIndex = songIndex;
+        if (nextIndex >= songs.length - 1) {
+          nextIndex = 0;
+        }
+        setCurrentSongIndex(nextIndex);
+      } else {
+        setCurrentSong(null);
+        setCurrentSongIndex(0);
+        setIsPlaying(false);
+      }
+    } else if (songIndex < currentSongIndex) {
+      // If removing a song before the current one, adjust the index
+      setCurrentSongIndex(currentSongIndex - 1);
+    }
   };
 
   return (
@@ -180,14 +248,20 @@ const HomePage = () => {
             />
             <Playlist
               songs={songs}
-              onRemoveSong={removeSong}
-              onReorderSongs={reorderSongs}
+              onRemoveSong={handleRemoveSong}
+              onReorderSongs={handleReorderSongs}
               onSongClick={handleSetCurrentSong}
+              currentSong={currentSong}
             />
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            Select a playlist or add songs
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-4">No playlist selected</h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                Select a playlist from the sidebar or create a new one to get started
+              </p>
+            </div>
           </div>
         )}
         <audio ref={playerRef} onEnded={handleNextSong} />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { ThemeContext } from '../context/ThemeContext';
+import toast from 'react-hot-toast';
 
 const Player = ({
   currentSong,
@@ -19,23 +20,121 @@ const Player = ({
   const { theme } = useContext(ThemeContext);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const progressRef = useRef(null);
   const iframeRef = useRef(null);
+  const youtubePlayerRef = useRef(null);
+  const progressUpdateInterval = useRef(null);
 
+  // Initialize YouTube Iframe API
+  useEffect(() => {
+    if (currentSong?.platform === 'youtube') {
+      if (progressUpdateInterval.current) {
+        clearInterval(progressUpdateInterval.current);
+      }
+
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+      window.onYouTubeIframeAPIReady = () => {
+        if (youtubePlayerRef.current) {
+          youtubePlayerRef.current.destroy();
+        }
+
+        youtubePlayerRef.current = new window.YT.Player(iframeRef.current, {
+          videoId: currentSong.url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1],
+          playerVars: {
+            autoplay: isAutoplay ? 1 : 0,
+            controls: 1,
+            enablejsapi: 1,
+          },
+          events: {
+            onReady: (event) => {
+              setDuration(event.target.getDuration());
+              if (isPlaying && isAutoplay) {
+                event.target.playVideo();
+              }
+              progressUpdateInterval.current = setInterval(() => {
+                if (youtubePlayerRef.current && youtubePlayerRef.current.getCurrentTime) {
+                  const current = youtubePlayerRef.current.getCurrentTime();
+                  const total = youtubePlayerRef.current.getDuration();
+                  setCurrentTime(current);
+                  setProgress((current / total) * 100 || 0);
+                }
+              }, 1000);
+            },
+            onStateChange: (event) => {
+              if (event.data === window.YT.PlayerState.ENDED) {
+                if (isAutoplay && isRepeat) {
+                  youtubePlayerRef.current.seekTo(0);
+                  youtubePlayerRef.current.playVideo();
+                } else if (isAutoplay) {
+                  onNextSong();
+                }
+              }
+              if (event.data === window.YT.PlayerState.PLAYING) {
+                onPlayPause(true);
+              } else if (event.data === window.YT.PlayerState.PAUSED) {
+                onPlayPause(false);
+              }
+            },
+          },
+        });
+      };
+
+      return () => {
+        if (progressUpdateInterval.current) {
+          clearInterval(progressUpdateInterval.current);
+        }
+        delete window.onYouTubeIframeAPIReady;
+      };
+    }
+  }, [currentSong, isAutoplay, isRepeat, onNextSong, onPlayPause]);
+
+  // Local audio progress and event handling
   useEffect(() => {
     const audio = playerRef.current;
-    if (audio && currentSong.platform === 'local') {
+    if (audio && currentSong?.platform === 'local') {
       audio.volume = volume;
+
       const updateProgress = () => {
         setProgress((audio.currentTime / audio.duration) * 100 || 0);
+        setCurrentTime(audio.currentTime);
+        setDuration(audio.duration);
       };
-      audio.addEventListener('timeupdate', updateProgress);
-      return () => audio.removeEventListener('timeupdate', updateProgress);
-    }
-  }, [playerRef, volume, currentSong]);
 
+      const handleLoadedMetadata = () => {
+        setDuration(audio.duration);
+      };
+
+      const handlePlay = () => {
+        onPlayPause(true);
+      };
+
+      const handlePause = () => {
+        onPlayPause(false);
+      };
+
+      audio.addEventListener('timeupdate', updateProgress);
+      audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.addEventListener('play', handlePlay);
+      audio.addEventListener('pause', handlePause);
+
+      return () => {
+        audio.removeEventListener('timeupdate', updateProgress);
+        audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.removeEventListener('play', handlePlay);
+        audio.removeEventListener('pause', handlePause);
+      };
+    }
+  }, [playerRef, volume, currentSong, onPlayPause]);
+
+  // Spotify/SoundCloud iframe control
   useEffect(() => {
-    if (currentSong.platform !== 'local' && iframeRef.current) {
+    if (currentSong?.platform !== 'local' && currentSong?.platform !== 'youtube' && iframeRef.current) {
       try {
         if (isPlaying && isAutoplay) {
           iframeRef.current.contentWindow.postMessage(
@@ -50,25 +149,91 @@ const Player = ({
         }
       } catch (err) {
         console.error('Iframe control failed:', err);
+        toast.error('Embed control limited; interact with the player');
       }
     }
   }, [isPlaying, isAutoplay, currentSong]);
 
-  const handleProgressChange = (e) => {
+  // Sync playing state with audio elements
+  useEffect(() => {
     const audio = playerRef.current;
-    if (audio && currentSong.platform === 'local') {
-      const newTime = (e.target.value / 100) * audio.duration;
+    if (audio && currentSong?.platform === 'local') {
+      if (isPlaying) {
+        audio.play().catch((err) => {
+          console.error('Play failed:', err);
+          toast.error('Playback failed; try interacting with the page');
+        });
+      } else {
+        audio.pause();
+      }
+    } else if (currentSong?.platform === 'youtube' && youtubePlayerRef.current) {
+      if (isPlaying) {
+        youtubePlayerRef.current.playVideo();
+      } else {
+        youtubePlayerRef.current.pauseVideo();
+      }
+    }
+  }, [isPlaying, currentSong, playerRef]);
+
+  const handleProgressChange = (e) => {
+    const newProgress = parseFloat(e.target.value);
+    const audio = playerRef.current;
+
+    if (audio && currentSong?.platform === 'local') {
+      const newTime = (newProgress / 100) * audio.duration;
       audio.currentTime = newTime;
-      setProgress(e.target.value);
+      setProgress(newProgress);
+      setCurrentTime(newTime);
+    } else if (currentSong?.platform === 'youtube' && youtubePlayerRef.current) {
+      const newTime = (newProgress / 100) * youtubePlayerRef.current.getDuration();
+      youtubePlayerRef.current.seekTo(newTime);
+      setProgress(newProgress);
+      setCurrentTime(newTime);
     }
   };
 
   const handleVolumeChange = (e) => {
-    setVolume(e.target.value);
-    if (playerRef.current && currentSong.platform === 'local') {
-      playerRef.current.volume = e.target.value;
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+
+    if (playerRef.current && currentSong?.platform === 'local') {
+      playerRef.current.volume = newVolume;
+    } else if (currentSong?.platform === 'youtube' && youtubePlayerRef.current) {
+      youtubePlayerRef.current.setVolume(newVolume * 100);
     }
   };
+
+  const handlePlayPause = () => {
+    if (currentSong?.platform === 'local' && playerRef.current) {
+      if (playerRef.current.paused) {
+        playerRef.current.play().catch((err) => {
+          console.error('Play failed:', err);
+          toast.error('Playback failed; try interacting with the page');
+        });
+      } else {
+        playerRef.current.pause();
+      }
+    } else if (currentSong?.platform === 'youtube' && youtubePlayerRef.current) {
+      if (isPlaying) {
+        youtubePlayerRef.current.pauseVideo();
+      } else {
+        youtubePlayerRef.current.playVideo();
+      }
+    } else {
+      onPlayPause(!isPlaying); // Toggle for Spotify/SoundCloud
+    }
+  };
+
+  const formatTime = (time) => {
+    if (isNaN(time)) return '0:00';
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  if (!currentSong) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col">
@@ -92,31 +257,44 @@ const Player = ({
           </div>
         </div>
         <div className="flex-1 mx-4">
-          {currentSong.platform === 'local' ? (
-            <div className="w-full">
-              <input
-                type="range"
-                value={progress}
-                onChange={handleProgressChange}
-                className="w-full accent-blue-500"
-                ref={progressRef}
-                aria-label="Seek song"
-              />
+          {currentSong.platform === 'yandex' ? (
+            <div className="w-full h-64 flex items-center justify-center">
+              <a
+                href={currentSong.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline"
+              >
+                Open Yandex Track
+              </a>
             </div>
           ) : (
-            <div className="w-full h-64">
-              <iframe
-                ref={iframeRef}
-                src={currentSong.url}
-                title={currentSong.title}
-                className="w-full h-full rounded"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-              />
-            </div>
+            <>
+              {currentSong.platform === 'local' ? (
+                <input
+                  type="range"
+                  value={progress}
+                  onChange={handleProgressChange}
+                  className="w-full accent-blue-500"
+                  ref={progressRef}
+                  aria-label="Seek song"
+                />
+              ) : (
+                <div className="w-full h-64">
+                  <iframe
+                    ref={iframeRef}
+                    src={currentSong.url}
+                    title={currentSong.title}
+                    className="w-full h-full rounded"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
-        {currentSong.platform === 'local' && (
+        {(currentSong.platform === 'local' || currentSong.platform === 'youtube') && (
           <div className="flex items-center space-x-2">
             <input
               type="range"
@@ -134,7 +312,7 @@ const Player = ({
       </motion.div>
       {/* Control Menu */}
       <motion.div
-        className={`fixed bottom-0 left-0 right-0 p-3 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-300'} shadow-lg z-50 flex justify-center items-center`} // High z-index
+        className={`fixed bottom-0 left-0 right-0 p-3 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-300'} shadow-lg z-50 flex justify-center items-center`}
         initial={{ y: 100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.3 }}
@@ -159,7 +337,7 @@ const Player = ({
             ⏮
           </motion.button>
           <motion.button
-            onClick={onPlayPause}
+            onClick={handlePlayPause}
             className="p-3 rounded-full bg-blue-500 text-white text-xl"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
