@@ -136,17 +136,10 @@ const Player = ({
   useEffect(() => {
     if (currentSong?.platform !== 'local' && currentSong?.platform !== 'youtube' && iframeRef.current) {
       try {
-        if (isPlaying && isAutoplay) {
-          iframeRef.current.contentWindow.postMessage(
-            '{"event":"command","func":"playVideo","args":""}',
-            '*'
-          );
-        } else {
-          iframeRef.current.contentWindow.postMessage(
-            '{"event":"command","func":"pauseVideo","args":""}',
-            '*'
-          );
-        }
+        const message = isPlaying && isAutoplay
+          ? '{"event":"command","func":"playVideo","args":""}'
+          : '{"event":"command","func":"pauseVideo","args":""}';
+        iframeRef.current.contentWindow.postMessage(message, '*');
       } catch (err) {
         console.error('Iframe control failed:', err);
         toast.error('Embed control limited; interact with the player');

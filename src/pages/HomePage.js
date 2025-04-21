@@ -39,8 +39,33 @@ const HomePage = () => {
   useEffect(() => {
     if (songs.length === 0) {
       setCurrentSong(null);
+      setCurrentSongIndex(0);
+      setShuffledIndices([]);
       return;
     }
+
+    // Update shuffled indices when songs change
+    if (isShuffled) {
+      const indices = [...Array(songs.length).keys()];
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+      // Ensure current song index is preserved in shuffle if valid
+      if (currentSong && songs.findIndex((s) => s.id === currentSong.id) !== -1) {
+        const currentIndex = songs.findIndex((s) => s.id === currentSong.id);
+        const shuffledIndex = indices.indexOf(currentIndex);
+        if (shuffledIndex !== -1) {
+          indices.splice(shuffledIndex, 1);
+          indices.unshift(currentIndex); // Place current song at the start of shuffle
+        }
+      }
+      setShuffledIndices(indices);
+    } else {
+      setShuffledIndices([...Array(songs.length).keys()]);
+    }
+
+    // Set current song based on index
     const index = isShuffled ? shuffledIndices[currentSongIndex] || currentSongIndex : currentSongIndex;
     if (index >= 0 && index < songs.length) {
       setCurrentSong(songs[index]);
@@ -54,25 +79,12 @@ const HomePage = () => {
         }
       }
     }
-  }, [songs, currentSongIndex, isPlaying, isShuffled, shuffledIndices, isAutoplay]);
-
-  useEffect(() => {
-    if (isShuffled && songs.length > 0) {
-      const indices = [...Array(songs.length).keys()];
-      for (let i = indices.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [indices[i], indices[j]] = [indices[j], indices[i]];
-      }
-      setShuffledIndices(indices);
-    } else {
-      setShuffledIndices([...Array(songs.length).keys()]);
-    }
-  }, [isShuffled, songs.length]);
+  }, [songs, currentSongIndex, isShuffled, isPlaying, isAutoplay]);
 
   const handleSelectPlaylist = (playlistId) => {
     setCurrentPlaylistId(playlistId);
     setCurrentSongIndex(0);
-    setIsPlaying(false); // Reset playing state when switching playlists
+    setIsPlaying(false);
   };
 
   const handlePlayPause = (playing) => {
@@ -83,16 +95,15 @@ const HomePage = () => {
     if (songs.length === 0) return;
     let nextIndex;
     if (isShuffled) {
-      const currentShuffledIndex = shuffledIndices.indexOf(currentSongIndex);
-      nextIndex = currentShuffledIndex + 1;
+      nextIndex = currentSongIndex + 1;
       if (nextIndex >= shuffledIndices.length) {
-        nextIndex = isRepeat ? 0 : currentShuffledIndex;
+        nextIndex = isRepeat ? 0 : currentSongIndex;
         if (!isRepeat) {
           setIsPlaying(false);
           return;
         }
       }
-      setCurrentSongIndex(shuffledIndices[nextIndex]);
+      setCurrentSongIndex(nextIndex);
     } else {
       nextIndex = currentSongIndex + 1;
       if (nextIndex >= songs.length) {
@@ -111,8 +122,7 @@ const HomePage = () => {
     if (songs.length === 0) return;
     let prevIndex;
     if (isShuffled) {
-      const currentShuffledIndex = shuffledIndices.indexOf(currentSongIndex);
-      prevIndex = currentShuffledIndex - 1;
+      prevIndex = currentSongIndex - 1;
       if (prevIndex < 0) {
         prevIndex = isRepeat ? shuffledIndices.length - 1 : 0;
         if (!isRepeat) {
@@ -120,7 +130,7 @@ const HomePage = () => {
           return;
         }
       }
-      setCurrentSongIndex(shuffledIndices[prevIndex]);
+      setCurrentSongIndex(prevIndex);
     } else {
       prevIndex = currentSongIndex - 1;
       if (prevIndex < 0) {
@@ -137,7 +147,27 @@ const HomePage = () => {
 
   const handleShuffle = () => {
     setIsShuffled(!isShuffled);
-    // Don't reset the current song index when toggling shuffle
+    if (!isShuffled && songs.length > 0) {
+      // Generate new shuffled indices, preserving current song
+      const indices = [...Array(songs.length).keys()];
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+      if (currentSong) {
+        const currentIndex = songs.findIndex((s) => s.id === currentSong.id);
+        if (currentIndex !== -1) {
+          const shuffledIndex = indices.indexOf(currentIndex);
+          indices.splice(shuffledIndex, 1);
+          indices.unshift(currentIndex); // Keep current song at start
+        }
+      }
+      setShuffledIndices(indices);
+      setCurrentSongIndex(0); // Reset to start of shuffled order
+    } else {
+      setShuffledIndices([...Array(songs.length).keys()]);
+      setCurrentSongIndex(songs.findIndex((s) => s.id === currentSong?.id) || 0);
+    }
     if (isAutoplay && currentSong) setIsPlaying(true);
   };
 
@@ -160,23 +190,32 @@ const HomePage = () => {
     const index = songs.findIndex((s) => s.id === song.id);
     if (index !== -1) {
       setCurrentSongIndex(index);
+      setCurrentSong(song);
+      if (isShuffled) {
+        // Update shuffled indices to start from the selected song
+        const indices = [...Array(songs.length).keys()];
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        const shuffledIndex = indices.indexOf(index);
+        indices.splice(shuffledIndex, 1);
+        indices.unshift(index); // Place selected song at start
+        setShuffledIndices(indices);
+        setCurrentSongIndex(0); // Start at the beginning of new shuffled order
+      }
       if (isAutoplay) setIsPlaying(true);
     }
   };
 
   const handleReorderSongs = (reorderedSongs, dragResult) => {
-    // Update the songs in the store
     reorderSongs(reorderedSongs);
-    
-    // Update the current song index if the current song was moved
     if (currentSong) {
-      const newIndex = reorderedSongs.findIndex(song => song.id === currentSong.id);
+      const newIndex = reorderedSongs.findIndex((song) => song.id === currentSong.id);
       if (newIndex !== -1) {
         setCurrentSongIndex(newIndex);
       }
     }
-    
-    // If shuffle is enabled, regenerate shuffled indices
     if (isShuffled) {
       const indices = [...Array(reorderedSongs.length).keys()];
       for (let i = indices.length - 1; i > 0; i--) {
@@ -188,13 +227,12 @@ const HomePage = () => {
   };
 
   const handleRemoveSong = (songId) => {
-    const songIndex = songs.findIndex(song => song.id === songId);
+    const songIndex = songs.findIndex((song) => song.id === songId);
     const isCurrentSong = currentSong && currentSong.id === songId;
-    
+
     removeSong(songId);
-    
+
     if (isCurrentSong) {
-      // If removing the current song, move to the next one or stop playing
       if (songs.length > 1) {
         let nextIndex = songIndex;
         if (nextIndex >= songs.length - 1) {
@@ -207,7 +245,6 @@ const HomePage = () => {
         setIsPlaying(false);
       }
     } else if (songIndex < currentSongIndex) {
-      // If removing a song before the current one, adjust the index
       setCurrentSongIndex(currentSongIndex - 1);
     }
   };
