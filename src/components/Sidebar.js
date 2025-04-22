@@ -20,12 +20,14 @@ const Sidebar = ({
   const [isRenaming, setIsRenaming] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [urlInput, setUrlInput] = useState('');
+  const [isAutoplay] = useState(true); // Adjust if managed elsewhere
 
   const handleCreatePlaylist = (e) => {
     e.preventDefault();
     if (newPlaylistName.trim()) {
-      onCreatePlaylist(newPlaylistName);
+      const newPlaylistId = onCreatePlaylist(newPlaylistName);
       setNewPlaylistName('');
+      onSelectPlaylist(newPlaylistId);
     }
   };
 
@@ -78,13 +80,30 @@ const Sidebar = ({
       if (urlInput.includes('youtube.com') || urlInput.includes('youtu.be')) {
         const videoId = urlInput.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
         if (!videoId) throw new Error('Invalid YouTube URL');
+
+        let title = 'YouTube Video';
+        let artist = 'Unknown Artist';
+        let thumbnail = `https://img.youtube.com/vi/${videoId}/default.jpg`;
+
+        try {
+          const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+          if (!response.ok) throw new Error('Failed to fetch YouTube oEmbed data');
+          const data = await response.json();
+          title = data.title || title;
+          artist = data.author_name || artist;
+          thumbnail = data.thumbnail_url || thumbnail;
+        } catch (oEmbedError) {
+          console.warn('YouTube oEmbed fetch failed, using fallback values:', oEmbedError);
+          toast.warn('Could not fetch YouTube metadata; using default values');
+        }
+
         song = {
           id: Date.now(),
-          title: 'YouTube Video',
-          artist: 'Unknown Artist',
+          title,
+          artist,
           album: 'YouTube',
-          thumbnail: `https://img.youtube.com/vi/${videoId}/default.jpg`,
-          url: `https://www.youtube.com/embed/${videoId}?autoplay=1`,
+          thumbnail,
+          url: `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=${isAutoplay ? 1 : 0}`,
           platform: 'youtube',
         };
       } else if (urlInput.includes('soundcloud.com')) {
@@ -152,7 +171,6 @@ const Sidebar = ({
       animate={{ x: 0 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Playlists</h2>
         <button
@@ -171,7 +189,6 @@ const Sidebar = ({
         className="w-full p-2 mb-4 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
         aria-label="Search playlists"
       />
-      {/* Playlist Section */}
       <div className="mb-6 p-4 rounded-lg shadow-md bg-gray-700 dark:bg-gray-900">
         <h3 className="text-lg font-semibold mb-2">Your Playlists</h3>
         <DragDropContext onDragEnd={handleDragEnd}>
@@ -258,7 +275,6 @@ const Sidebar = ({
           </button>
         </form>
       </div>
-      {/* Add Media Section */}
       <div className="p-4 rounded-lg shadow-lg bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700">
         <h3 className="text-lg font-semibold mb-4 text-blue-700 dark:text-blue-400">Add Media</h3>
         <div className="space-y-4">
