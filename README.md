@@ -1,70 +1,154 @@
-# Getting Started with Create React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# Music Player App
 
-## Available Scripts
+A modern, web-based music player built with React, supporting playback of local MP3 files and streaming from YouTube, Spotify, SoundCloud, and Yandex Music. It features a responsive and themeable UI, playlist management, and smooth playback controls.
 
-In the project directory, you can run:
+## Features
 
-### `npm start`
+### Multi-Platform Playback
+- Local MP3: Upload and play with metadata extraction (title, artist, album, thumbnail).
+- YouTube: Embed video playback via iframe, with oEmbed metadata.
+- Spotify & SoundCloud: Playback via iframe embeds and oEmbed for metadata.
+- Yandex Music: Direct playback with fallback metadata.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Playlist Management
+- Create, rename, and delete playlists.
+- Auto-select new playlists.
+- Add songs by local file or URL.
+- Drag-and-drop to reorder playlists and songs.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### Playback Controls
+- Play/pause, next/previous song.
+- Shuffle, repeat, and autoplay support.
+- Song selection overrides shuffle mode.
+- Progress bar for local MP3 and YouTube.
 
-### `npm test`
+### UI/UX
+- Responsive design with light/dark mode.
+- Smooth animations via Framer Motion.
+- Toast notifications for actions and errors.
+- Searchable playlist list.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Performance
+- Custom drag-and-drop for large song lists.
+- Debounced input to prevent rapid submissions.
 
-### `npm run build`
+## Getting Started
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Prerequisites
+- Node.js v14 or higher
+- Modern browser: Chrome, Firefox, Edge, Safari
+- Internet connection (for streaming content)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Installation
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Clone the repository:
+```bash
+git clone https://github.com/your-username/music-player-app.git
+cd music-player-app
+```
 
-### `npm run eject`
+Install dependencies:
+```bash
+npm install
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Start the development server:
+```bash
+npm start
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+The app will be available at http://localhost:3000
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Usage
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Create a Playlist
+1. Enter a name in the sidebar under “New Playlist”
+2. Click "Create Playlist"
 
-## Learn More
+### Add Songs
+- Local MP3: Click "Upload Local MP3", select a file — metadata is auto-extracted.
+- Streaming URL: Paste a URL (YouTube, Spotify, SoundCloud, Yandex) and click "Add Media".
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Manage Playlists
+- Click a playlist to select it.
+- Rename or remove via buttons.
+- Drag and drop to reorder.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Manage Songs
+- Click a song to play.
+- Remove to delete.
+- Drag and drop to change order.
 
-### Code Splitting
+### Playback Controls
+- Toggle play/pause
+- Next / Previous
+- Enable/disable shuffle, repeat, autoplay
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Theme Toggle
+Click the sun/moon icon in the sidebar to switch themes.
 
-### Analyzing the Bundle Size
+## Tech Stack
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Libraries Used
+- react, react-dom — Core framework
+- zustand — State management
+- framer-motion — Animations
+- react-beautiful-dnd — Playlist drag-and-drop
+- music-metadata-browser — MP3 metadata
+- lodash.debounce — Input debouncing
+- react-hot-toast — Toast notifications
+- react-player — Fallback for streaming
+- styled-components, tailwindcss — Styling
 
-### Making a Progressive Web App
+### File Structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```
+music-player-app/
+├── public/
+│   ├── index.html
+│   └── favicon.ico
+├── src/
+│   ├── components/
+│   │   ├── Sidebar.js
+│   │   ├── Player.js
+│   │   └── Playlist.js
+│   ├── context/
+│   │   └── ThemeContext.js
+│   ├── store.js
+│   ├── HomePage.js
+│   ├── App.js
+│   └── index.js
+├── package.json
+└── README.md
+```
 
-### Advanced Configuration
+## Known Limitations
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- Autoplay: Some browsers block autoplay for streaming content without user interaction.
+- YouTube oEmbed: Fallback metadata used if API fails.
+- Yandex Music: No oEmbed; uses fallback metadata.
+- Touch Drag-and-Drop: May need refinement for mobile.
 
-### Deployment
+## Contributing
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+1. Fork the repository
+2. Create a branch: git checkout -b feature/your-feature
+3. Commit: git commit -m "Add your feature"
+4. Push: git push origin feature/your-feature
+5. Open a Pull Request
 
-### `npm run build` fails to minify
+Please follow existing coding style, write tests if applicable, and update the README if needed.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## License
+
+Licensed under the MIT License. See the LICENSE file for details.
+
+## Acknowledgments
+
+Built with React. Inspired by modern music apps. Thanks to open-source libraries:
+- Framer Motion
+- React Beautiful DnD
+- Music Metadata Browser
+- Zustand
+- React Hot Toast
