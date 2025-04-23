@@ -14,13 +14,13 @@ const Sidebar = ({
   onRenamePlaylist,
   onReorderPlaylists,
   currentPlaylistId,
+  isAutoplay, // Added prop
 }) => {
   const { theme, setTheme } = useContext(ThemeContext);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [isRenaming, setIsRenaming] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [urlInput, setUrlInput] = useState('');
-  const [isAutoplay] = useState(true); // Adjust if managed elsewhere
 
   const handleCreatePlaylist = (e) => {
     e.preventDefault();
@@ -51,7 +51,7 @@ const Sidebar = ({
           platform: 'local',
         };
         onAddSong(song);
-        toast.success('Song added successfully');
+        toast.success('Content added successfully');
       } catch (error) {
         console.error('Metadata read error:', error);
         toast.error('Failed to read metadata; using default values');
@@ -59,7 +59,7 @@ const Sidebar = ({
           id: Date.now(),
           title: file.name,
           artist: 'Unknown Artist',
-          album: 'Unknown Album',
+          album: 'Local',
           thumbnail: 'https://via.placeholder.com/50',
           url,
           platform: 'local',
@@ -67,7 +67,7 @@ const Sidebar = ({
         onAddSong(song);
       }
     } else {
-      toast.error('Please upload an MP3 file');
+      toast.error('Please upload a valid MP3 file');
     }
   };
 
@@ -78,7 +78,7 @@ const Sidebar = ({
 
     try {
       if (urlInput.includes('youtube.com') || urlInput.includes('youtu.be')) {
-        const videoId = urlInput.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+        const videoId = urlInput.match(/(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
         if (!videoId) throw new Error('Invalid YouTube URL');
 
         let title = 'YouTube Video';
@@ -93,7 +93,7 @@ const Sidebar = ({
           artist = data.author_name || artist;
           thumbnail = data.thumbnail_url || thumbnail;
         } catch (oEmbedError) {
-          console.warn('YouTube oEmbed fetch failed, using fallback values:', oEmbedError);
+          console.error('YouTube oEmbed fetch failed:', oEmbedError);
           toast.warn('Could not fetch YouTube metadata; using default values');
         }
 
@@ -153,7 +153,7 @@ const Sidebar = ({
   };
 
   const handleDragEnd = (result) => {
-    if (!result.destination) return;
+    if (!result?.destination) return;
     const reorderedPlaylists = Array.from(playlists);
     const [removed] = reorderedPlaylists.splice(result.source.index, 1);
     reorderedPlaylists.splice(result.destination.index, 0, removed);
@@ -161,7 +161,7 @@ const Sidebar = ({
   };
 
   const filteredPlaylists = playlists.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    p.name?.toLowerCase()?.includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -171,7 +171,7 @@ const Sidebar = ({
       animate={{ x: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center justify-between mb-4">
         <h2 className="text-xl font-bold">Playlists</h2>
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -179,17 +179,17 @@ const Sidebar = ({
           aria-label="Toggle theme"
         >
           {theme === 'dark' ? '☀️' : '🌙'}
-        </button>
-      </div>
-      <input
-        type="text"
-        placeholder="Search playlists..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full p-2 mb-4 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
-        aria-label="Search playlists"
-      />
-      <div className="mb-6 p-4 rounded-lg shadow-md bg-gray-700 dark:bg-gray-900">
+            </button>
+        </div>
+        <input
+          type="text"
+          placeholder="Search playlists..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-2 mb-4 rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+          aria-label="Search playlists"
+        />
+      <div className="mb-6 p-4 rounded-lg shadow-md bg-gray-50 dark:bg-gray-900">
         <h3 className="text-lg font-semibold mb-2">Your Playlists</h3>
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="playlists">
@@ -202,13 +202,12 @@ const Sidebar = ({
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
-                        className={`flex justify-between items-center p-3 mb-2 rounded ${
-                          currentPlaylistId === playlist.id
-                            ? 'bg-blue-500 text-white'
+                        className={`flex justify-between items-center p-3 mb-2 rounded ${currentPlaylistId === playlist.id
+                            ? 'bg-blue-100 dark:bg-blue-600'
                             : snapshot.isDragging
-                            ? 'bg-gray-300 dark:bg-gray-600'
+                            ? 'bg-gray-100 dark:bg-gray-600'
                             : 'bg-white dark:bg-gray-700'
-                        } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
+                            } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
                         onClick={() => onSelectPlaylist(playlist.id)}
                         aria-label={`Select playlist ${playlist.name}`}
                       >
@@ -223,9 +222,7 @@ const Sidebar = ({
                               onChange={(e) => onRenamePlaylist(playlist.id, e.target.value)}
                               onBlur={() => setIsRenaming(null)}
                               autoFocus
-                              className={`flex-1 bg-transparent border-none outline-none ${
-                                currentPlaylistId === playlist.id ? 'text-white' : ''
-                              }`}
+                              className={`flex-1 bg-transparent border-none outline-none outline-none ${currentPlaylistId === playlist.id ? 'text-blue-gray-900' : ''}`}
                               aria-label={`Rename playlist ${playlist.name}`}
                             />
                           ) : (
@@ -263,7 +260,7 @@ const Sidebar = ({
             value={newPlaylistName}
             onChange={(e) => setNewPlaylistName(e.target.value)}
             placeholder="New Playlist"
-            className="w-full p-2 mb-2 rounded bg-gray-600 dark:bg-gray-800 text-gray-300 dark:text-gray-200"
+            className="w-full p-2 mb-2 rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-400"
             aria-label="New playlist name"
           />
           <button
@@ -275,45 +272,48 @@ const Sidebar = ({
           </button>
         </form>
       </div>
-      <div className="p-4 rounded-lg shadow-lg bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700">
-        <h3 className="text-lg font-semibold mb-4 text-blue-700 dark:text-blue-400">Add Media</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2" htmlFor="file-upload">
-              Upload Local MP3
-            </label>
-            <input
-              id="file-upload"
-              type="file"
-              accept="audio/mp3"
-              onChange={handleAddLocalSong}
-              className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600"
-              aria-label="Upload MP3 file"
-            />
+
+      {currentPlaylistId && (
+        <div className="p-4 rounded-lg shadow-md bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700">
+          <h3 class="text-blue-700" className="text-lg font-semibold mb-4 dark:text-blue-400">Add Media</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2" for="file-input">
+                Upload Local MP3
+              </label>
+              <input
+                id="file-input"
+                type="file"
+                accept="audio/mp3"
+                onChange={handleAddLocalSong}
+                className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600"
+                aria-label="Upload MP3 file"
+              />
+            </div>
+            <form onSubmit={handleAddUrl}>
+              <label class="block" className="block text-sm font-medium mb-2" for="url-input">
+                Add YouTube, Spotify, SoundCloud, or Yandex URL
+              </label>
+              <input
+                id="url-input"
+                type="text"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="e.g., https://youtube.com/watch?v=..."
+                class="w-full" className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-300 dark:text-gray-200 border-gray-300 dark:border-blue-600"
+                aria-label="Add media URL"
+              />
+              <button
+                type="submit"
+                className="w-full p-2 mt-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white"
+                aria-label="Add Media"
+              >
+                Add Media
+              </button>
+            </form>
           </div>
-          <form onSubmit={handleAddUrl}>
-            <label className="block text-sm font-medium mb-2" htmlFor="url-input">
-              Add YouTube, Spotify, SoundCloud, or Yandex URL
-            </label>
-            <input
-              id="url-input"
-              type="text"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="Paste URL here..."
-              className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600"
-              aria-label="Add media URL"
-            />
-            <button
-              type="submit"
-              className="w-full p-2 rounded-md mt-2 bg-blue-600 hover:bg-blue-700 text-white"
-              aria-label="Add URL"
-            >
-              Add Media
-            </button>
-          </form>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 };

@@ -34,7 +34,11 @@ const HomePage = () => {
   useEffect(() => {
     const loadedPlaylists = JSON.parse(localStorage.getItem('playlists') || '[]');
     setPlaylists(loadedPlaylists);
-  }, [setPlaylists]);
+    // Only set initial playlist if none is selected
+    if (!currentPlaylistId && loadedPlaylists.length > 0) {
+      setCurrentPlaylistId(loadedPlaylists[0].id);
+    }
+  }, [setPlaylists, currentPlaylistId]);
 
   useEffect(() => {
     if (songs.length === 0) {
@@ -44,20 +48,18 @@ const HomePage = () => {
       return;
     }
 
-    // Update shuffled indices when songs change
     if (isShuffled) {
       const indices = [...Array(songs.length).keys()];
       for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [indices[i], indices[j]] = [indices[j], indices[i]];
       }
-      // Ensure current song index is preserved in shuffle if valid
       if (currentSong && songs.findIndex((s) => s.id === currentSong.id) !== -1) {
         const currentIndex = songs.findIndex((s) => s.id === currentSong.id);
         const shuffledIndex = indices.indexOf(currentIndex);
         if (shuffledIndex !== -1) {
           indices.splice(shuffledIndex, 1);
-          indices.unshift(currentIndex); // Place current song at the start of shuffle
+          indices.unshift(currentIndex);
         }
       }
       setShuffledIndices(indices);
@@ -65,7 +67,6 @@ const HomePage = () => {
       setShuffledIndices([...Array(songs.length).keys()]);
     }
 
-    // Set current song based on index
     const index = isShuffled ? shuffledIndices[currentSongIndex] || currentSongIndex : currentSongIndex;
     if (index >= 0 && index < songs.length) {
       setCurrentSong(songs[index]);
@@ -79,7 +80,7 @@ const HomePage = () => {
         }
       }
     }
-  }, [songs, currentSongIndex, isShuffled, isPlaying, isAutoplay]);
+  }, [songs, currentSongIndex, isShuffled, isPlaying, isAutoplay, currentSong]);
 
   const handleSelectPlaylist = (playlistId) => {
     setCurrentPlaylistId(playlistId);
@@ -148,7 +149,6 @@ const HomePage = () => {
   const handleShuffle = () => {
     setIsShuffled(!isShuffled);
     if (!isShuffled && songs.length > 0) {
-      // Generate new shuffled indices, preserving current song
       const indices = [...Array(songs.length).keys()];
       for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -159,11 +159,11 @@ const HomePage = () => {
         if (currentIndex !== -1) {
           const shuffledIndex = indices.indexOf(currentIndex);
           indices.splice(shuffledIndex, 1);
-          indices.unshift(currentIndex); // Keep current song at start
+          indices.unshift(currentIndex);
         }
       }
       setShuffledIndices(indices);
-      setCurrentSongIndex(0); // Reset to start of shuffled order
+      setCurrentSongIndex(0);
     } else {
       setShuffledIndices([...Array(songs.length).keys()]);
       setCurrentSongIndex(songs.findIndex((s) => s.id === currentSong?.id) || 0);
@@ -192,7 +192,6 @@ const HomePage = () => {
       setCurrentSongIndex(index);
       setCurrentSong(song);
       if (isShuffled) {
-        // Update shuffled indices to start from the selected song
         const indices = [...Array(songs.length).keys()];
         for (let i = indices.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -200,9 +199,9 @@ const HomePage = () => {
         }
         const shuffledIndex = indices.indexOf(index);
         indices.splice(shuffledIndex, 1);
-        indices.unshift(index); // Place selected song at start
+        indices.unshift(index);
         setShuffledIndices(indices);
-        setCurrentSongIndex(0); // Start at the beginning of new shuffled order
+        setCurrentSongIndex(0);
       }
       if (isAutoplay) setIsPlaying(true);
     }
@@ -265,6 +264,7 @@ const HomePage = () => {
         onCreatePlaylist={createPlaylist}
         onAddSong={debounce(addSong, 500)}
         currentPlaylistId={currentPlaylistId}
+        isAutoplay={isAutoplay} // Pass isAutoplay to Sidebar
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         {songs.length > 0 && currentSong ? (

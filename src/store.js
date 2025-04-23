@@ -1,76 +1,77 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
-export const useStore = create(
-  persist(
-    (set) => ({
-      playlists: [],
-      currentPlaylistId: null,
-      setPlaylists: (playlists) => set({ playlists }, false, 'setPlaylists'),
-      addSong: (song) =>
-        set(
-          (state) => ({
-            playlists: state.playlists.map((p) =>
-              p.id === state.currentPlaylistId ? { ...p, songs: [...p.songs, song] } : p
-            ),
-          }),
-          false,
-          'addSong'
-        ),
-      removeSong: (songId) =>
-        set(
-          (state) => ({
-            playlists: state.playlists.map((p) =>
-              p.id === state.currentPlaylistId
-                ? { ...p, songs: p.songs.filter((s) => s.id !== songId) }
-                : p
-            ),
-          }),
-          false,
-          'removeSong'
-        ),
-      reorderSongs: (newSongs) =>
-        set(
-          (state) => ({
-            playlists: state.playlists.map((p) =>
-              p.id === state.currentPlaylistId ? { ...p, songs: newSongs } : p
-            ),
-          }),
-          false,
-          'reorderSongs'
-        ),
-      createPlaylist: (name) =>
-        set(
-          (state) => ({
-            playlists: [...state.playlists, { id: Date.now(), name, songs: [] }],
-          }),
-          false,
-          'createPlaylist'
-        ),
-      removePlaylist: (playlistId) =>
-        set(
-          (state) => ({
-            playlists: state.playlists.filter((p) => p.id !== playlistId),
-          }),
-          false,
-          'removePlaylist'
-        ),
-      renamePlaylist: (playlistId, newName) =>
-        set(
-          (state) => ({
-            playlists: state.playlists.map((p) =>
-              p.id === playlistId ? { ...p, name: newName } : p
-            ),
-          }),
-          false,
-          'renamePlaylist'
-        ),
-      reorderPlaylists: (playlists) => set({ playlists }, false, 'reorderPlaylists'),
-      setCurrentPlaylistId: (id) => set({ currentPlaylistId: id }, false, 'setCurrentPlaylistId'),
+export const useStore = create((set) => ({
+  playlists: [],
+  currentPlaylistId: null,
+  setPlaylists: (playlists) => {
+    set({ playlists });
+    localStorage.setItem('playlists', JSON.stringify(playlists));
+  },
+  setCurrentPlaylistId: (id) => set({ currentPlaylistId: id }),
+  addSong: (song) =>
+    set((state) => {
+      const updatedPlaylists = state.playlists.map((playlist) =>
+        playlist.id === state.currentPlaylistId
+          ? { ...playlist, songs: [...playlist.songs, song] }
+          : playlist
+      );
+      localStorage.setItem('playlists', JSON.stringify(updatedPlaylists));
+      return { playlists: updatedPlaylists };
     }),
-    {
-      name: 'playlists-storage',
-      storage: localStorage,
-    }
-  )
-);
+  removeSong: (songId) =>
+    set((state) => {
+      const updatedPlaylists = state.playlists.map((playlist) =>
+        playlist.id === state.currentPlaylistId
+          ? {
+              ...playlist,
+              songs: playlist.songs.filter((song) => song.id !== songId),
+            }
+          : playlist
+      );
+      localStorage.setItem('playlists', JSON.stringify(updatedPlaylists));
+      return { playlists: updatedPlaylists };
+    }),
+  reorderSongs: (reorderedSongs) =>
+    set((state) => {
+      const updatedPlaylists = state.playlists.map((playlist) =>
+        playlist.id === state.currentPlaylistId
+          ? { ...playlist, songs: reorderedSongs }
+          : playlist
+      );
+      localStorage.setItem('playlists', JSON.stringify(updatedPlaylists));
+      return { playlists: updatedPlaylists };
+    }),
+  createPlaylist: (name) => {
+    const newPlaylist = { id: Date.now(), name, songs: [] };
+    set((state) => {
+      const updatedPlaylists = [...state.playlists, newPlaylist];
+      localStorage.setItem('playlists', JSON.stringify(updatedPlaylists));
+      return { playlists: updatedPlaylists };
+    });
+    return newPlaylist.id; // Return the new playlist ID
+  },
+  removePlaylist: (playlistId) =>
+    set((state) => {
+      const updatedPlaylists = state.playlists.filter(
+        (playlist) => playlist.id !== playlistId
+      );
+      localStorage.setItem('playlists', JSON.stringify(updatedPlaylists));
+      return {
+        playlists: updatedPlaylists,
+        currentPlaylistId:
+          state.currentPlaylistId === playlistId ? null : state.currentPlaylistId,
+      };
+    }),
+  renamePlaylist: (playlistId, newName) =>
+    set((state) => {
+      const updatedPlaylists = state.playlists.map((playlist) =>
+        playlist.id === playlistId ? { ...playlist, name: newName } : playlist
+      );
+      localStorage.setItem('playlists', JSON.stringify(updatedPlaylists));
+      return { playlists: updatedPlaylists };
+    }),
+  reorderPlaylists: (reorderedPlaylists) => {
+    set({ playlists: reorderedPlaylists });
+    localStorage.setItem('playlists', JSON.stringify(reorderedPlaylists));
+  },
+}));
