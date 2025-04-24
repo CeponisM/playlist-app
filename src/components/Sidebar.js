@@ -14,7 +14,7 @@ const Sidebar = ({
   onRenamePlaylist,
   onReorderPlaylists,
   currentPlaylistId,
-  isAutoplay, // Added prop
+  isAutoplay,
 }) => {
   const { theme, setTheme } = useContext(ThemeContext);
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -28,52 +28,89 @@ const Sidebar = ({
       const newPlaylistId = onCreatePlaylist(newPlaylistName);
       setNewPlaylistName('');
       onSelectPlaylist(newPlaylistId);
+    } else {
+      toast.error('Playlist name cannot be empty');
     }
   };
 
   const handleAddLocalSong = async (e) => {
     e.preventDefault();
     const file = e.target.files?.[0];
-    if (file && file.type === 'audio/mp3') {
-      const url = URL.createObjectURL(file);
-      try {
-        const metadata = await parseBlob(file);
-        const picture = metadata.common.picture?.[0];
-        const song = {
-          id: Date.now(),
-          title: metadata.common.title || file.name,
-          artist: metadata.common.artist || 'Unknown Artist',
-          album: metadata.common.album || 'Unknown Album',
-          thumbnail: picture
-            ? `data:${picture.format};base64,${Buffer.from(picture.data).toString('base64')}`
-            : 'https://via.placeholder.com/50',
-          url,
-          platform: 'local',
-        };
-        onAddSong(song);
-        toast.success('Content added successfully');
-      } catch (error) {
-        console.error('Metadata read error:', error);
-        toast.error('Failed to read metadata; using default values');
-        const song = {
-          id: Date.now(),
-          title: file.name,
-          artist: 'Unknown Artist',
-          album: 'Local',
-          thumbnail: 'https://via.placeholder.com/50',
-          url,
-          platform: 'local',
-        };
-        onAddSong(song);
-      }
-    } else {
-      toast.error('Please upload a valid MP3 file');
+    console.log('File selected:', file);
+
+    if (!file) {
+      console.warn('No file selected');
+      toast.error('No file selected');
+      return;
     }
+
+    // Accept MP3, MP4, MKV
+    const validTypes = ['audio/mpeg', 'video/mp4', 'video/x-matroska'];
+    if (!validTypes.includes(file.type)) {
+      console.warn('Invalid file type:', file.type);
+      toast.error('Please upload an MP3, MP4, or MKV file');
+      return;
+    }
+
+    if (!currentPlaylistId) {
+      console.warn('No playlist selected');
+      toast.error('Please select a playlist first');
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    let song = {
+      id: Date.now(),
+      title: file.name,
+      artist: 'Unknown Artist',
+      album: 'Local',
+      thumbnail: 'https://via.placeholder.com/50',
+      url,
+      platform: 'local',
+    };
+
+    try {
+      const metadata = await parseBlob(file);
+      console.log('Metadata extracted:', metadata);
+      const picture = metadata.common.picture?.[0];
+      song = {
+        ...song,
+        title: metadata.common.title || file.name,
+        artist: metadata.common.artist || 'Unknown Artist',
+        album: metadata.common.album || 'Local',
+        thumbnail: picture
+          ? `data:${picture.format};base64,${Buffer.from(picture.data).toString('base64')}`
+          : song.thumbnail,
+      };
+    } catch (error) {
+      console.warn('Metadata extraction failed:', error);
+      toast.warn('Could not read metadata; using default values');
+    }
+
+    try {
+      console.log('Adding song to playlist:', song);
+      onAddSong(song);
+      toast.success('File added successfully');
+    } catch (error) {
+      console.error('Failed to add song:', error);
+      toast.error('Failed to add file to playlist');
+    }
+
+    // Reset input value to allow re-adding the same file
+    e.target.value = '';
   };
 
   const handleAddUrl = async (e) => {
     e.preventDefault();
-    if (!urlInput) return;
+    if (!urlInput) {
+      toast.error('URL cannot be empty');
+      return;
+    }
+    if (!currentPlaylistId) {
+      toast.error('Please select a playlist first');
+      return;
+    }
+
     let song = { id: Date.now(), platform: 'unknown' };
 
     try {
@@ -143,6 +180,7 @@ const Sidebar = ({
       } else {
         throw new Error('Unsupported URL');
       }
+      console.log('Adding URL song:', song);
       onAddSong(song);
       toast.success('Content added successfully');
       setUrlInput('');
@@ -171,7 +209,7 @@ const Sidebar = ({
       animate={{ x: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex justify-between items-center justify-between mb-4">
+      <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Playlists</h2>
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -179,16 +217,16 @@ const Sidebar = ({
           aria-label="Toggle theme"
         >
           {theme === 'dark' ? '☀️' : '🌙'}
-            </button>
-        </div>
-        <input
-          type="text"
-          placeholder="Search playlists..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full p-2 mb-4 rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
-          aria-label="Search playlists"
-        />
+        </button>
+      </div>
+      <input
+        type="text"
+        placeholder="Search playlists..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full p-2 mb-4 rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+        aria-label="Search playlists"
+      />
       <div className="mb-6 p-4 rounded-lg shadow-md bg-gray-50 dark:bg-gray-900">
         <h3 className="text-lg font-semibold mb-2">Your Playlists</h3>
         <DragDropContext onDragEnd={handleDragEnd}>
@@ -202,18 +240,19 @@ const Sidebar = ({
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
-                        className={`flex justify-between items-center p-3 mb-2 rounded ${currentPlaylistId === playlist.id
+                        className={`flex justify-between items-center p-3 mb-2 rounded ${
+                          currentPlaylistId === playlist.id
                             ? 'bg-blue-100 dark:bg-blue-600'
                             : snapshot.isDragging
                             ? 'bg-gray-100 dark:bg-gray-600'
                             : 'bg-white dark:bg-gray-700'
-                            } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
+                        } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
                         onClick={() => onSelectPlaylist(playlist.id)}
                         aria-label={`Select playlist ${playlist.name}`}
                       >
                         <div className="flex items-center space-x-2">
                           {currentPlaylistId === playlist.id && (
-                            <span className="text-blue-300">▶</span>
+                            <span className="text-blue-500">▶</span>
                           )}
                           {isRenaming === playlist.id ? (
                             <input
@@ -222,7 +261,9 @@ const Sidebar = ({
                               onChange={(e) => onRenamePlaylist(playlist.id, e.target.value)}
                               onBlur={() => setIsRenaming(null)}
                               autoFocus
-                              className={`flex-1 bg-transparent border-none outline-none outline-none ${currentPlaylistId === playlist.id ? 'text-blue-gray-900' : ''}`}
+                              className={`flex-1 bg-transparent border-none outline-none ${
+                                currentPlaylistId === playlist.id ? 'text-blue-gray-900' : ''
+                              }`}
                               aria-label={`Rename playlist ${playlist.name}`}
                             />
                           ) : (
@@ -231,14 +272,20 @@ const Sidebar = ({
                         </div>
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => setIsRenaming(playlist.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsRenaming(playlist.id);
+                            }}
                             className="text-sm"
                             aria-label={`Rename playlist ${playlist.name}`}
                           >
                             Rename
                           </button>
                           <button
-                            onClick={() => onRemovePlaylist(playlist.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemovePlaylist(playlist.id);
+                            }}
                             className="text-sm text-red-500"
                             aria-label={`Remove playlist ${playlist.name}`}
                           >
@@ -275,23 +322,23 @@ const Sidebar = ({
 
       {currentPlaylistId && (
         <div className="p-4 rounded-lg shadow-md bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700">
-          <h3 class="text-blue-700" className="text-lg font-semibold mb-4 dark:text-blue-400">Add Media</h3>
+          <h3 className="text-lg font-semibold mb-4 text-blue-700 dark:text-blue-400">Add Media</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2" for="file-input">
-                Upload Local MP3
+              <label className="block text-sm font-medium mb-2" htmlFor="file-input">
+                Upload Local Media
               </label>
               <input
                 id="file-input"
                 type="file"
-                accept="audio/mp3"
+                accept="audio/mpeg,video/mp4,video/x-matroska"
                 onChange={handleAddLocalSong}
                 className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600"
-                aria-label="Upload MP3 file"
+                aria-label="Upload MP3, MP4, or MKV file"
               />
             </div>
             <form onSubmit={handleAddUrl}>
-              <label class="block" className="block text-sm font-medium mb-2" for="url-input">
+              <label className="block text-sm font-medium mb-2" htmlFor="url-input">
                 Add YouTube, Spotify, SoundCloud, or Yandex URL
               </label>
               <input
@@ -300,7 +347,7 @@ const Sidebar = ({
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="e.g., https://youtube.com/watch?v=..."
-                class="w-full" className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-300 dark:text-gray-200 border-gray-300 dark:border-blue-600"
+                className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-300 dark:text-gray-200 border-gray-300 dark:border-blue-600"
                 aria-label="Add media URL"
               />
               <button

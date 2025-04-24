@@ -10,6 +10,7 @@ export const useStore = create((set) => ({
   setCurrentPlaylistId: (id) => set({ currentPlaylistId: id }),
   addSong: (song) =>
     set((state) => {
+      console.log('Adding song to store:', song, 'Playlist ID:', state.currentPlaylistId);
       const updatedPlaylists = state.playlists.map((playlist) =>
         playlist.id === state.currentPlaylistId
           ? { ...playlist, songs: [...playlist.songs, song] }
@@ -48,7 +49,7 @@ export const useStore = create((set) => ({
       localStorage.setItem('playlists', JSON.stringify(updatedPlaylists));
       return { playlists: updatedPlaylists };
     });
-    return newPlaylist.id; // Return the new playlist ID
+    return newPlaylist.id;
   },
   removePlaylist: (playlistId) =>
     set((state) => {
