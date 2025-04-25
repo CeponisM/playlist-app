@@ -145,16 +145,32 @@ const Sidebar = ({
         };
       } else if (urlInput.includes('soundcloud.com')) {
         const response = await fetch(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(urlInput)}`);
+        if (!response.ok) throw new Error('Failed to fetch SoundCloud oEmbed data');
         const data = await response.json();
+
+        // Extract base iframe src and append autoplay parameter
+        let embedUrl = data.html.match(/src="([^"]+)"/)?.[1] || urlInput;
+        // Ensure autoplay and other embed options
+        const urlObj = new URL(embedUrl);
+        urlObj.searchParams.set('auto_play', isAutoplay ? 'true' : 'false');
+        urlObj.searchParams.set('hide_related', 'true');
+        urlObj.searchParams.set('show_comments', 'false');
+        urlObj.searchParams.set('show_user', 'true');
+        urlObj.searchParams.set('show_reposts', 'false');
+
         song = {
           id: Date.now(),
           title: data.title || 'SoundCloud Track',
           artist: data.author_name || 'Unknown Artist',
           album: 'SoundCloud',
           thumbnail: data.thumbnail_url || 'https://via.placeholder.com/50',
-          url: data.html.match(/src="([^"]+)"/)?.[1] || urlInput,
+          url: urlObj.toString(),
           platform: 'soundcloud',
         };
+        console.log('SoundCloud song added:', song);
+        onAddSong(song);
+        toast.success('Content added successfully');
+        setUrlInput('');
       } else if (urlInput.includes('spotify.com')) {
         const response = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(urlInput)}`);
         const data = await response.json();
@@ -240,13 +256,12 @@ const Sidebar = ({
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
-                        className={`flex justify-between items-center p-3 mb-2 rounded ${
-                          currentPlaylistId === playlist.id
+                        className={`flex justify-between items-center p-3 mb-2 rounded ${currentPlaylistId === playlist.id
                             ? 'bg-blue-100 dark:bg-blue-600'
                             : snapshot.isDragging
-                            ? 'bg-gray-100 dark:bg-gray-600'
-                            : 'bg-white dark:bg-gray-700'
-                        } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
+                              ? 'bg-gray-100 dark:bg-gray-600'
+                              : 'bg-white dark:bg-gray-700'
+                          } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
                         onClick={() => onSelectPlaylist(playlist.id)}
                         aria-label={`Select playlist ${playlist.name}`}
                       >
@@ -261,9 +276,8 @@ const Sidebar = ({
                               onChange={(e) => onRenamePlaylist(playlist.id, e.target.value)}
                               onBlur={() => setIsRenaming(null)}
                               autoFocus
-                              className={`flex-1 bg-transparent border-none outline-none ${
-                                currentPlaylistId === playlist.id ? 'text-blue-gray-900' : ''
-                              }`}
+                              className={`flex-1 bg-transparent border-none outline-none ${currentPlaylistId === playlist.id ? 'text-blue-gray-900' : ''
+                                }`}
                               aria-label={`Rename playlist ${playlist.name}`}
                             />
                           ) : (
