@@ -44,7 +44,6 @@ const Sidebar = ({
       return;
     }
 
-    // Accept MP3, MP4, MKV
     const validTypes = ['audio/mpeg', 'video/mp4', 'video/x-matroska'];
     if (!validTypes.includes(file.type)) {
       console.warn('Invalid file type:', file.type);
@@ -65,7 +64,7 @@ const Sidebar = ({
       artist: 'Unknown Artist',
       album: 'Local',
       thumbnail: 'https://via.placeholder.com/50',
-      url,
+      url, // No autoplay parameter for local files
       platform: 'local',
     };
 
@@ -96,7 +95,6 @@ const Sidebar = ({
       toast.error('Failed to add file to playlist');
     }
 
-    // Reset input value to allow re-adding the same file
     e.target.value = '';
   };
 
@@ -140,7 +138,7 @@ const Sidebar = ({
           artist,
           album: 'YouTube',
           thumbnail,
-          url: `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=${isAutoplay ? 1 : 0}`,
+          url: `https://www.youtube.com/embed/${videoId}?enablejsapi=1`, // No autoplay
           platform: 'youtube',
         };
       } else if (urlInput.includes('soundcloud.com')) {
@@ -148,15 +146,13 @@ const Sidebar = ({
         if (!response.ok) throw new Error('Failed to fetch SoundCloud oEmbed data');
         const data = await response.json();
 
-        // Extract base iframe src and append autoplay parameter
         let embedUrl = data.html.match(/src="([^"]+)"/)?.[1] || urlInput;
-        // Ensure autoplay and other embed options
         const urlObj = new URL(embedUrl);
-        urlObj.searchParams.set('auto_play', isAutoplay ? 'true' : 'false');
         urlObj.searchParams.set('hide_related', 'true');
         urlObj.searchParams.set('show_comments', 'false');
         urlObj.searchParams.set('show_user', 'true');
         urlObj.searchParams.set('show_reposts', 'false');
+        // No auto_play parameter
 
         song = {
           id: Date.now(),
@@ -167,20 +163,18 @@ const Sidebar = ({
           url: urlObj.toString(),
           platform: 'soundcloud',
         };
-        console.log('SoundCloud song added:', song);
-        onAddSong(song);
-        toast.success('Content added successfully');
-        setUrlInput('');
       } else if (urlInput.includes('spotify.com')) {
         const response = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(urlInput)}`);
+        if (!response.ok) throw new Error('Failed to fetch Spotify oEmbed data');
         const data = await response.json();
+
         song = {
           id: Date.now(),
           title: data.title || 'Spotify Track',
           artist: data.author_name || 'Unknown Artist',
           album: 'Spotify',
           thumbnail: data.thumbnail_url || 'https://via.placeholder.com/50',
-          url: data.html.match(/src="([^"]+)"/)?.[1] || urlInput,
+          url: data.html.match(/src="([^"]+)"/)?.[1] || urlInput, // No autoplay
           platform: 'spotify',
         };
       } else if (urlInput.includes('yandex')) {
@@ -190,13 +184,13 @@ const Sidebar = ({
           artist: 'Unknown Artist',
           album: 'Yandex',
           thumbnail: 'https://via.placeholder.com/50',
-          url: urlInput,
+          url: urlInput, // No autoplay
           platform: 'yandex',
         };
       } else {
         throw new Error('Unsupported URL');
       }
-      console.log('Adding URL song:', song);
+      console.log('Adding song:', song);
       onAddSong(song);
       toast.success('Content added successfully');
       setUrlInput('');
@@ -257,10 +251,10 @@ const Sidebar = ({
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
                         className={`flex justify-between items-center p-3 mb-2 rounded ${currentPlaylistId === playlist.id
-                            ? 'bg-blue-100 dark:bg-blue-600'
-                            : snapshot.isDragging
-                              ? 'bg-gray-100 dark:bg-gray-600'
-                              : 'bg-white dark:bg-gray-700'
+                          ? 'bg-blue-100 dark:bg-blue-600'
+                          : snapshot.isDragging
+                            ? 'bg-gray-100 dark:bg-gray-600'
+                            : 'bg-white dark:bg-gray-700'
                           } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
                         onClick={() => onSelectPlaylist(playlist.id)}
                         aria-label={`Select playlist ${playlist.name}`}

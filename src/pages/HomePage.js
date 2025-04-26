@@ -31,10 +31,29 @@ const HomePage = () => {
   const playerRef = useRef(null);
   const songs = playlists.find((p) => p.id === currentPlaylistId)?.songs || [];
 
+  // Function to add autoplay parameters to song URL based on platform
+  const getSongUrlWithAutoplay = (song) => {
+    if (song.platform === 'local') {
+      return song.url; // Local files handle autoplay via playerRef
+    }
+
+    const urlObj = new URL(song.url);
+    if (song.platform === 'youtube') {
+      urlObj.searchParams.set('autoplay', isAutoplay ? '1' : '0');
+      urlObj.searchParams.set('enablejsapi', '1');
+    } else if (song.platform === 'soundcloud') {
+      urlObj.searchParams.set('auto_play', isAutoplay ? 'true' : 'false');
+    } else if (song.platform === 'spotify') {
+      // Spotify embed doesn't support autoplay parameter; rely on player logic
+    } else if (song.platform === 'yandex') {
+      // Yandex may not support autoplay; leave unchanged or add if supported
+    }
+    return urlObj.toString();
+  };
+
   useEffect(() => {
     const loadedPlaylists = JSON.parse(localStorage.getItem('playlists') || '[]');
     setPlaylists(loadedPlaylists);
-    // Only set initial playlist if none is selected
     if (!currentPlaylistId && loadedPlaylists.length > 0) {
       setCurrentPlaylistId(loadedPlaylists[0].id);
     }
@@ -69,9 +88,12 @@ const HomePage = () => {
 
     const index = isShuffled ? shuffledIndices[currentSongIndex] || currentSongIndex : currentSongIndex;
     if (index >= 0 && index < songs.length) {
-      setCurrentSong(songs[index]);
-      if (playerRef.current && songs[index]?.url && songs[index].platform === 'local') {
-        playerRef.current.src = songs[index].url;
+      const song = songs[index];
+      const urlWithAutoplay = getSongUrlWithAutoplay(song);
+      setCurrentSong({ ...song, url: urlWithAutoplay });
+      if (playerRef.current && song.platform === 'local') {
+        playerRef.current.src = song.url;
+        playerRef.current.autoplay = isAutoplay && isPlaying;
         if (isPlaying && isAutoplay) {
           playerRef.current.play().catch((err) => {
             console.error('Autoplay failed:', err);
@@ -80,7 +102,39 @@ const HomePage = () => {
         }
       }
     }
-  }, [songs, currentSongIndex, isShuffled, isPlaying, isAutoplay, currentSong]);
+  }, [songs, currentSongIndex, isShuffled, isPlaying, isAutoplay]);
+
+  const handleSetCurrentSong = (song) => {
+    const index = songs.findIndex((s) => s.id === song.id);
+    if (index !== -1) {
+      setCurrentSongIndex(index);
+      const urlWithAutoplay = getSongUrlWithAutoplay(song);
+      setCurrentSong({ ...song, url: urlWithAutoplay });
+      if (isShuffled) {
+        const indices = [...Array(songs.length).keys()];
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        const shuffledIndex = indices.indexOf(index);
+        indices.splice(shuffledIndex, 1);
+        indices.unshift(index);
+        setShuffledIndices(indices);
+        setCurrentSongIndex(0);
+      }
+      if (song.platform === 'local' && playerRef.current) {
+        playerRef.current.src = song.url;
+        playerRef.current.autoplay = isAutoplay;
+        if (isAutoplay) {
+          playerRef.current.play().catch((err) => {
+            console.error('Autoplay failed:', err);
+            toast.error('Autoplay blocked; please interact with the page');
+          });
+        }
+      }
+      if (isAutoplay) setIsPlaying(true);
+    }
+  };
 
   const handleSelectPlaylist = (playlistId) => {
     setCurrentPlaylistId(playlistId);
@@ -104,7 +158,6 @@ const HomePage = () => {
           return;
         }
       }
-      setCurrentSongIndex(nextIndex);
     } else {
       nextIndex = currentSongIndex + 1;
       if (nextIndex >= songs.length) {
@@ -114,7 +167,23 @@ const HomePage = () => {
           return;
         }
       }
-      setCurrentSongIndex(nextIndex);
+    }
+    setCurrentSongIndex(nextIndex);
+    const index = isShuffled ? shuffledIndices[nextIndex] : nextIndex;
+    if (index >= 0 && index < songs.length) {
+      const song = songs[index];
+      const urlWithAutoplay = getSongUrlWithAutoplay(song);
+      setCurrentSong({ ...song, url: urlWithAutoplay });
+      if (song.platform === 'local' && playerRef.current) {
+        playerRef.current.src = song.url;
+        playerRef.current.autoplay = isAutoplay;
+        if (isAutoplay) {
+          playerRef.current.play().catch((err) => {
+            console.error('Autoplay failed:', err);
+            toast.error('Autoplay blocked; please interact with the page');
+          });
+        }
+      }
     }
     if (isAutoplay) setIsPlaying(true);
   };
@@ -131,7 +200,6 @@ const HomePage = () => {
           return;
         }
       }
-      setCurrentSongIndex(prevIndex);
     } else {
       prevIndex = currentSongIndex - 1;
       if (prevIndex < 0) {
@@ -141,7 +209,23 @@ const HomePage = () => {
           return;
         }
       }
-      setCurrentSongIndex(prevIndex);
+    }
+    setCurrentSongIndex(prevIndex);
+    const index = isShuffled ? shuffledIndices[prevIndex] : prevIndex;
+    if (index >= 0 && index < songs.length) {
+      const song = songs[index];
+      const urlWithAutoplay = getSongUrlWithAutoplay(song);
+      setCurrentSong({ ...song, url: urlWithAutoplay });
+      if (song.platform === 'local' && playerRef.current) {
+        playerRef.current.src = song.url;
+        playerRef.current.autoplay = isAutoplay;
+        if (isAutoplay) {
+          playerRef.current.play().catch((err) => {
+            console.error('Autoplay failed:', err);
+            toast.error('Autoplay blocked; please interact with the page');
+          });
+        }
+      }
     }
     if (isAutoplay) setIsPlaying(true);
   };
@@ -183,27 +267,6 @@ const HomePage = () => {
         toast.error('Autoplay blocked; please interact with the page');
       });
       setIsPlaying(true);
-    }
-  };
-
-  const handleSetCurrentSong = (song) => {
-    const index = songs.findIndex((s) => s.id === song.id);
-    if (index !== -1) {
-      setCurrentSongIndex(index);
-      setCurrentSong(song);
-      if (isShuffled) {
-        const indices = [...Array(songs.length).keys()];
-        for (let i = indices.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [indices[i], indices[j]] = [indices[j], indices[i]];
-        }
-        const shuffledIndex = indices.indexOf(index);
-        indices.splice(shuffledIndex, 1);
-        indices.unshift(index);
-        setShuffledIndices(indices);
-        setCurrentSongIndex(0);
-      }
-      if (isAutoplay) setIsPlaying(true);
     }
   };
 
