@@ -63,23 +63,20 @@ const Sidebar = ({
       title: file.name,
       artist: 'Unknown Artist',
       album: 'Local',
-      thumbnail: 'https://via.placeholder.com/50',
-      url, // No autoplay parameter for local files
+      thumbnail: 'https://cdn-icons-png.flaticon.com/512/727/727249.png', // Music note icon
+      url,
       platform: 'local',
     };
 
     try {
       const metadata = await parseBlob(file);
       console.log('Metadata extracted:', metadata);
-      const picture = metadata.common.picture?.[0];
       song = {
         ...song,
         title: metadata.common.title || file.name,
         artist: metadata.common.artist || 'Unknown Artist',
         album: metadata.common.album || 'Local',
-        thumbnail: picture
-          ? `data:${picture.format};base64,${Buffer.from(picture.data).toString('base64')}`
-          : song.thumbnail,
+        // Keep default music icon, ignore picture
       };
     } catch (error) {
       console.warn('Metadata extraction failed:', error);

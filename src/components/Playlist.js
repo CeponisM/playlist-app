@@ -4,17 +4,14 @@ import { ThemeContext } from '../context/ThemeContext';
 import toast from 'react-hot-toast';
 
 const Playlist = ({ songs, onRemoveSong, onReorderSongs, onSongClick, currentSong }) => {
+  const handleDragStart = (e, index) => {
+    e.dataTransfer.setData('text/plain', index);
+  };
   const { theme } = useContext(ThemeContext);
   const [draggedIndex, setDraggedIndex] = useState(null);
 
-  const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
-    e.dataTransfer.setData('text/plain', index);
-    e.currentTarget.style.opacity = '0.5';
-  };
-
-  const handleDragOver = (e, index) => {
-    e.preventDefault(); // Allow dropping
+  const handleDragOver = (e) => {
+    e.preventDefault();
   };
 
   const handleDrop = (e, dropIndex) => {
@@ -22,22 +19,10 @@ const Playlist = ({ songs, onRemoveSong, onReorderSongs, onSongClick, currentSon
     const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
     if (dragIndex === dropIndex) return;
 
-    try {
-      const reorderedSongs = Array.from(songs);
-      const [draggedSong] = reorderedSongs.splice(dragIndex, 1);
-      reorderedSongs.splice(dropIndex, 0, draggedSong);
-      
-      onReorderSongs(reorderedSongs, { source: { index: dragIndex }, destination: { index: dropIndex } });
-      toast.success('Songs reordered');
-    } catch (error) {
-      console.error('Song reordering failed:', error);
-      toast.error('Failed to reorder songs');
-    } finally {
-      setDraggedIndex(null);
-      document.querySelectorAll('.song-item').forEach((el) => {
-        el.style.opacity = '1';
-      });
-    }
+    const reorderedSongs = [...songs];
+    const [draggedSong] = reorderedSongs.splice(dragIndex, 1);
+    reorderedSongs.splice(dropIndex, 0, draggedSong);
+    onReorderSongs(reorderedSongs, { source: { index: dragIndex }, destination: { index: dropIndex } });
   };
 
   const handleDragEnd = () => {
@@ -49,68 +34,55 @@ const Playlist = ({ songs, onRemoveSong, onReorderSongs, onSongClick, currentSon
 
   return (
     <motion.div
-      className="flex-1 overflow-y-auto p-4 pb-20"
+      className="flex-1 p-4 overflow-y-auto"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="min-h-[100px]">
+      <h2 className="text-xl font-bold mb-4">Playlist</h2>
+      <div className="space-y-2">
         {songs.map((song, index) => (
-          <motion.div
-            key={`song-${song.id}`}
-            className={`song-item flex items-center p-3 mb-2 rounded ${
-              draggedIndex === index
-                ? 'bg-gray-300 dark:bg-gray-600 shadow-lg'
-                : currentSong && currentSong.id === song.id
-                ? 'bg-blue-100 dark:bg-blue-800 border-2 border-blue-500'
-                : 'bg-white dark:bg-gray-700'
-            } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-move`}
+          <div
+            key={song.id}
             draggable
             onDragStart={(e) => handleDragStart(e, index)}
-            onDragOver={(e) => handleDragOver(e, index)}
+            onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, index)}
-            onDragEnd={handleDragEnd}
+            className={`flex items-center p-2 rounded cursor-pointer ${
+              currentSong?.id === song.id
+                ? 'bg-blue-100 dark:bg-blue-600'
+                : 'bg-white dark:bg-gray-700'
+            } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors`}
             onClick={() => onSongClick(song)}
-            whileHover={{ scale: 1.02 }}
-            style={{ zIndex: draggedIndex === index ? 1000 : 0 }}
-            aria-label={`Play ${song.title}`}
           >
             <img
               src={song.thumbnail}
               alt={song.title}
-              className="w-12 h-12 mr-4 rounded"
-              loading="lazy"
+              className="w-10 h-10 object-cover rounded mr-3"
+              onError={(e) => {
+                e.target.src = 'https://cdn-icons-png.flaticon.com/512/727/727249.png'; // Fallback icon
+              }}
             />
-            <div className="flex-1">
-              <h3
-                className={`font-semibold ${
-                  currentSong && currentSong.id === song.id ? 'text-blue-600 dark:text-blue-400' : ''
-                }`}
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-sm font-medium text-gray-900 dark:text-white truncate"
+                title={song.title} // Full title on hover
               >
                 {song.title}
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{song.artist}</p>
-              {song.album && (
-                <p className="text-sm text-gray-500 dark:text-gray-500">{song.album}</p>
-              )}
-              <p className="text-sm text-gray-500 dark:text-gray-500">{song.platform}</p>
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{song.artist}</p>
             </div>
-            {currentSong && currentSong.id === song.id && (
-              <div className="mr-4 text-blue-500">
-                <span className="text-lg">♪</span>
-              </div>
-            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onRemoveSong(song.id);
               }}
-              className="text-red-500 hover:text-red-700"
+              className="ml-2 text-red-500 hover:text-red-700"
               aria-label={`Remove ${song.title}`}
             >
               Remove
             </button>
-          </motion.div>
+          </div>
         ))}
       </div>
     </motion.div>
