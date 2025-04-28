@@ -1,3 +1,4 @@
+// src/components/Sidebar.js
 import React, { useState, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
@@ -63,7 +64,7 @@ const Sidebar = ({
       title: file.name,
       artist: 'Unknown Artist',
       album: 'Local',
-      thumbnail: 'https://cdn-icons-png.flaticon.com/512/727/727249.png', // Music note icon
+      thumbnail: 'https://cdn-icons-png.flaticon.com/512/727/727249.png',
       url,
       platform: 'local',
     };
@@ -76,7 +77,6 @@ const Sidebar = ({
         title: metadata.common.title || file.name,
         artist: metadata.common.artist || 'Unknown Artist',
         album: metadata.common.album || 'Local',
-        // Keep default music icon, ignore picture
       };
     } catch (error) {
       console.warn('Metadata extraction failed:', error);
@@ -135,7 +135,7 @@ const Sidebar = ({
           artist,
           album: 'YouTube',
           thumbnail,
-          url: `https://www.youtube.com/embed/${videoId}?enablejsapi=1`, // No autoplay
+          url: `https://www.youtube.com/embed/${videoId}?enablejsapi=1`,
           platform: 'youtube',
         };
       } else if (urlInput.includes('soundcloud.com')) {
@@ -149,7 +149,6 @@ const Sidebar = ({
         urlObj.searchParams.set('show_comments', 'false');
         urlObj.searchParams.set('show_user', 'true');
         urlObj.searchParams.set('show_reposts', 'false');
-        // No auto_play parameter
 
         song = {
           id: Date.now(),
@@ -171,7 +170,7 @@ const Sidebar = ({
           artist: data.author_name || 'Unknown Artist',
           album: 'Spotify',
           thumbnail: data.thumbnail_url || 'https://via.placeholder.com/50',
-          url: data.html.match(/src="([^"]+)"/)?.[1] || urlInput, // No autoplay
+          url: data.html.match(/src="([^"]+)"/)?.[1] || urlInput,
           platform: 'spotify',
         };
       } else if (urlInput.includes('yandex')) {
@@ -181,7 +180,7 @@ const Sidebar = ({
           artist: 'Unknown Artist',
           album: 'Yandex',
           thumbnail: 'https://via.placeholder.com/50',
-          url: urlInput, // No autoplay
+          url: urlInput,
           platform: 'yandex',
         };
       } else {
@@ -211,16 +210,18 @@ const Sidebar = ({
 
   return (
     <motion.div
-      className={`w-full md:w-80 p-4 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} overflow-y-auto`}
+      className={`w-full md:w-80 p-4 h-full flex flex-col ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'} overflow-y-auto md:overflow-y-auto`}
       initial={{ x: -100 }}
       animate={{ x: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Playlists</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'} bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-600`}>
+          MelodyHub
+        </h1>
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="p-2 rounded-full bg-gray-300 dark:bg-gray-700"
+          className={`p-2 rounded-full ${theme === 'dark' ? 'bg-gray-700 text-yellow-400' : 'bg-gray-300 text-gray-800'} hover:opacity-80 transition`}
           aria-label="Toggle theme"
         >
           {theme === 'dark' ? '☀️' : '🌙'}
@@ -231,11 +232,11 @@ const Sidebar = ({
         placeholder="Search playlists..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full p-2 mb-4 rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+        className={`w-full p-2 mb-4 rounded ${theme === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
         aria-label="Search playlists"
       />
-      <div className="mb-6 p-4 rounded-lg shadow-md bg-gray-50 dark:bg-gray-900">
-        <h3 className="text-lg font-semibold mb-2">Your Playlists</h3>
+      <div className={`mb-6 p-4 rounded-lg shadow-md ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}`}>
+        <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>Your Playlists</h3>
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="playlists">
             {(provided) => (
@@ -248,15 +249,15 @@ const Sidebar = ({
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
                         className={`flex justify-between items-center p-3 mb-2 rounded ${currentPlaylistId === playlist.id
-                          ? 'bg-blue-100 dark:bg-blue-600'
+                          ? theme === 'dark' ? 'bg-blue-600' : 'bg-blue-100'
                           : snapshot.isDragging
-                            ? 'bg-gray-100 dark:bg-gray-600'
-                            : 'bg-white dark:bg-gray-700'
-                          } hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer`}
+                          ? theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'
+                          : theme === 'dark' ? 'bg-gray-700' : 'bg-white'
+                        } hover:${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'} transition-colors cursor-pointer touch-none select-none`}
                         onClick={() => onSelectPlaylist(playlist.id)}
                         aria-label={`Select playlist ${playlist.name}`}
                       >
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
                           {currentPlaylistId === playlist.id && (
                             <span className="text-blue-500">▶</span>
                           )}
@@ -267,31 +268,24 @@ const Sidebar = ({
                               onChange={(e) => onRenamePlaylist(playlist.id, e.target.value)}
                               onBlur={() => setIsRenaming(null)}
                               autoFocus
-                              className={`flex-1 bg-transparent border-none outline-none ${currentPlaylistId === playlist.id ? 'text-blue-gray-900' : ''
-                                }`}
+                              className={`flex-1 bg-transparent border-none outline-none ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
                               aria-label={`Rename playlist ${playlist.name}`}
                             />
                           ) : (
-                            <span>{playlist.name}</span>
+                            <span className="truncate">{playlist.name}</span>
                           )}
                         </div>
                         <div className="flex space-x-2">
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsRenaming(playlist.id);
-                            }}
-                            className="text-sm"
+                            onClick={(e) => { e.stopPropagation(); setIsRenaming(playlist.id); }}
+                            className={`text-sm ${theme === 'dark' ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                             aria-label={`Rename playlist ${playlist.name}`}
                           >
                             Rename
                           </button>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRemovePlaylist(playlist.id);
-                            }}
-                            className="text-sm text-red-500"
+                            onClick={(e) => { e.stopPropagation(); onRemovePlaylist(playlist.id); }}
+                            className="text-sm text-red-500 hover:text-red-700"
                             aria-label={`Remove playlist ${playlist.name}`}
                           >
                             Remove
@@ -312,25 +306,24 @@ const Sidebar = ({
             value={newPlaylistName}
             onChange={(e) => setNewPlaylistName(e.target.value)}
             placeholder="New Playlist"
-            className="w-full p-2 mb-2 rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-400"
+            className={`w-full p-2 mb-2 rounded ${theme === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
             aria-label="New playlist name"
           />
           <button
             type="submit"
-            className="w-full p-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full p-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition"
             aria-label="Create playlist"
           >
             Create Playlist
           </button>
         </form>
       </div>
-
       {currentPlaylistId && (
-        <div className="p-4 rounded-lg shadow-md bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700">
-          <h3 className="text-lg font-semibold mb-4 text-blue-700 dark:text-blue-400">Add Media</h3>
+        <div className={`p-4 rounded-lg shadow-md ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'} border`}>
+          <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Add Media</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2" htmlFor="file-input">
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`} htmlFor="file-input">
                 Upload Local Media
               </label>
               <input
@@ -338,12 +331,12 @@ const Sidebar = ({
                 type="file"
                 accept="audio/mpeg,video/mp4,video/x-matroska"
                 onChange={handleAddLocalSong}
-                className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600"
+                className={`w-full p-2 rounded ${theme === 'dark' ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 aria-label="Upload MP3, MP4, or MKV file"
               />
             </div>
             <form onSubmit={handleAddUrl}>
-              <label className="block text-sm font-medium mb-2" htmlFor="url-input">
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`} htmlFor="url-input">
                 Add YouTube, Spotify, SoundCloud, or Yandex URL
               </label>
               <input
@@ -352,12 +345,12 @@ const Sidebar = ({
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="e.g., https://youtube.com/watch?v=..."
-                className="w-full p-2 rounded bg-white dark:bg-gray-800 text-gray-300 dark:text-gray-200 border-gray-300 dark:border-blue-600"
+                className={`w-full p-2 rounded ${theme === 'dark' ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 aria-label="Add media URL"
               />
               <button
                 type="submit"
-                className="w-full p-2 mt-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full p-2 mt-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition"
                 aria-label="Add Media"
               >
                 Add Media
