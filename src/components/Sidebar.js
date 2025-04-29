@@ -37,7 +37,7 @@ const Sidebar = ({
   const handleAddLocalSong = async (e) => {
     e.preventDefault();
     const file = e.target.files?.[0];
-    console.log('File selected:', file);
+    console.log('File:', file);
 
     if (!file) {
       console.warn('No file selected');
@@ -54,24 +54,25 @@ const Sidebar = ({
 
     if (!currentPlaylistId) {
       console.warn('No playlist selected');
-      toast.error('Please select a playlist first');
+      toast.error('Please select a playlist');
       return;
     }
 
     const url = URL.createObjectURL(file);
     let song = {
       id: Date.now(),
-      title: file.name,
-      artist: 'Unknown Artist',
+      title: file.name || 'Unknown Song',
+      artist: 'Unknown',
       album: 'Local',
       thumbnail: 'https://cdn-icons-png.flaticon.com/512/727/727249.png',
       url,
       platform: 'local',
+      file, // Store file reference
     };
 
     try {
       const metadata = await parseBlob(file);
-      console.log('Metadata extracted:', metadata);
+      console.log('Metadata:', metadata);
       song = {
         ...song,
         title: metadata.common.title || file.name,
@@ -80,16 +81,16 @@ const Sidebar = ({
       };
     } catch (error) {
       console.warn('Metadata extraction failed:', error);
-      toast.warn('Could not read metadata; using default values');
+      toast.warn('Could not read metadata; using defaults');
     }
 
     try {
-      console.log('Adding song to playlist:', song);
+      console.log('Adding song:', song);
       onAddSong(song);
-      toast.success('File added successfully');
+      toast.success('File added');
     } catch (error) {
       console.error('Failed to add song:', error);
-      toast.error('Failed to add file to playlist');
+      toast.error('Failed to add file');
     }
 
     e.target.value = '';
@@ -251,9 +252,9 @@ const Sidebar = ({
                         className={`flex justify-between items-center p-3 mb-2 rounded ${currentPlaylistId === playlist.id
                           ? theme === 'dark' ? 'bg-blue-600' : 'bg-blue-100'
                           : snapshot.isDragging
-                          ? theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'
-                          : theme === 'dark' ? 'bg-gray-700' : 'bg-white'
-                        } hover:${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'} transition-colors cursor-pointer touch-none select-none`}
+                            ? theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'
+                            : theme === 'dark' ? 'bg-gray-700' : 'bg-white'
+                          } hover:${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'} transition-colors cursor-pointer touch-none select-none`}
                         onClick={() => onSelectPlaylist(playlist.id)}
                         aria-label={`Select playlist ${playlist.name}`}
                       >

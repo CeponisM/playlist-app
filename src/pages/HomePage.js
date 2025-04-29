@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import Sidebar from '../components/Sidebar';
 import Player from '../components/Player';
 import Playlist from '../components/Playlist';
+import Comments from '../components/Comments';
 import { useStore } from '../store';
 import { debounce } from 'lodash';
 import toast from 'react-hot-toast';
@@ -39,12 +40,21 @@ const HomePage = () => {
     }
     const urlObj = new URL(song.url);
     if (song.platform === 'youtube') {
-      urlObj.searchParams.set('autoplay', isAutoplay ? '1' : '0');
+      urlObj.searchParams.set('autoplay', isAutoplay && isPlaying ? '1' : '0');
       urlObj.searchParams.set('enablejsapi', '1');
     } else if (song.platform === 'soundcloud') {
-      urlObj.searchParams.set('auto_play', isAutoplay ? 'true' : 'false');
+      urlObj.searchParams.set('auto_play', isAutoplay && isPlaying ? 'true' : 'false');
     }
     return urlObj.toString();
+  };
+
+  const controlIframePlayback = (play) => {
+    if (!playerRef.current || !currentSong || currentSong.platform === 'local') return;
+    const message = JSON.stringify({
+      event: 'command',
+      func: play ? 'playVideo' : 'pauseVideo',
+    });
+    playerRef.current.contentWindow?.postMessage(message, '*');
   };
 
   useEffect(() => {
@@ -60,6 +70,7 @@ const HomePage = () => {
       setCurrentSong(null);
       setCurrentSongIndex(0);
       setShuffledIndices([]);
+      setIsPlaying(false);
       return;
     }
 
@@ -97,6 +108,7 @@ const HomePage = () => {
           });
         }
       }
+      if (isPlaying) controlIframePlayback(true);
     }
   }, [songs, currentSongIndex, isShuffled, isPlaying, isAutoplay]);
 
@@ -120,15 +132,16 @@ const HomePage = () => {
       }
       if (song.platform === 'local' && playerRef.current) {
         playerRef.current.src = song.url;
-        playerRef.current.autoplay = isAutoplay;
-        if (isAutoplay) {
+        playerRef.current.autoplay = isAutoplay && isPlaying;
+        if (isAutoplay && isPlaying) {
           playerRef.current.play().catch((err) => {
             console.error('Autoplay failed:', err);
             toast.error('Autoplay blocked; please interact with the page');
           });
         }
       }
-      setIsPlaying(isAutoplay);
+      setIsPlaying(isAutoplay && isPlaying);
+      if (isPlaying) controlIframePlayback(true);
     }
   };
 
@@ -173,6 +186,7 @@ const HomePage = () => {
         }
       }
       setIsPlaying(isAutoplay);
+      if (isAutoplay) controlIframePlayback(true);
     }
   };
 
@@ -217,6 +231,7 @@ const HomePage = () => {
         }
       }
       setIsPlaying(isAutoplay);
+      if (isAutoplay) controlIframePlayback(true);
     }
   };
 
@@ -231,10 +246,10 @@ const HomePage = () => {
       } else {
         playerRef.current.pause();
       }
+    } else {
+      controlIframePlayback(playing);
     }
   };
-
-  // ... (other handlers: handleShuffle, handleRepeat, handleAutoplay, etc.)
 
   return (
     <motion.div
@@ -257,72 +272,74 @@ const HomePage = () => {
           onCreatePlaylist={createPlaylist}
           onAddSong={debounce(addSong, 500)}
           currentPlaylistId={currentPlaylistId}
-          isAutoplay={isAutoplay}
         />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {songs.length > 0 && currentSong ? (
-            <>
-              <Player
-                currentSong={currentSong}
-                isPlaying={isPlaying}
-                isRepeat={isRepeat}
-                isShuffled={isShuffled}
-                isAutoplay={isAutoplay}
-                onPlayPause={handlePlayPause}
-                onNextSong={handleNextSong}
-                onPreviousSong={handlePreviousSong}
-                onShuffle={() => {
-                  setIsShuffled(!isShuffled);
-                  setCurrentSongIndex(0);
-                }}
-                onRepeat={() => setIsRepeat(!isRepeat)}
-                onAutoplay={() => setIsAutoplay(!isAutoplay)}
-                playerRef={playerRef}
-              />
-              <Playlist
-                songs={songs}
-                onRemoveSong={(songId) => {
-                  const songIndex = songs.findIndex((song) => song.id === songId);
-                  const isCurrentSong = currentSong && currentSong.id === songId;
-                  removeSong(songId);
-                  if (isCurrentSong) {
-                    if (songs.length > 1) {
-                      let nextIndex = songIndex;
-                      if (nextIndex >= songs.length - 1) nextIndex = 0;
-                      setCurrentSongIndex(nextIndex);
-                    } else {
-                      setCurrentSong(null);
-                      setCurrentSongIndex(0);
-                      setIsPlaying(false);
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {songs.length > 0 && currentSong ? (
+              <>
+                <Player
+                  currentSong={currentSong}
+                  isPlaying={isPlaying}
+                  isRepeat={isRepeat}
+                  isShuffled={isShuffled}
+                  isAutoplay={isAutoplay}
+                  onPlayPause={handlePlayPause}
+                  onNextSong={handleNextSong}
+                  onPreviousSong={handlePreviousSong}
+                  onShuffle={() => {
+                    setIsShuffled(!isShuffled);
+                    setCurrentSongIndex(0);
+                  }}
+                  onRepeat={() => setIsRepeat(!isRepeat)}
+                  onAutoplay={() => setIsAutoplay(!isAutoplay)}
+                  playerRef={playerRef}
+                />
+                <Playlist
+                  songs={songs}
+                  onRemoveSong={(songId) => {
+                    const songIndex = songs.findIndex((song) => song.id === songId);
+                    const isCurrentSong = currentSong && currentSong.id === songId;
+                    removeSong(songId);
+                    if (isCurrentSong) {
+                      if (songs.length > 1) {
+                        let nextIndex = songIndex;
+                        if (nextIndex >= songs.length - 1) nextIndex = 0;
+                        setCurrentSongIndex(nextIndex);
+                      } else {
+                        setCurrentSong(null);
+                        setCurrentSongIndex(0);
+                        setIsPlaying(false);
+                      }
+                    } else if (songIndex < currentSongIndex) {
+                      setCurrentSongIndex(currentSongIndex - 1);
                     }
-                  } else if (songIndex < currentSongIndex) {
-                    setCurrentSongIndex(currentSongIndex - 1);
-                  }
-                }}
-                onReorderSongs={(reorderedSongs, dragResult) => {
-                  reorderSongs(reorderedSongs);
-                  if (currentSong) {
-                    const newIndex = reorderedSongs.findIndex((song) => song.id === currentSong.id);
-                    if (newIndex !== -1) setCurrentSongIndex(newIndex);
-                  }
-                }}
-                onSongClick={handleSetCurrentSong}
-                currentSong={currentSong}
-              />
-            </>
-          ) : (
-            <div className={`flex-1 flex items-center justify-center ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
-              <div className="text-center">
-                <h2 className={`text-2xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  No playlist selected
-                </h2>
-                <p className={`text-gray-400 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Select a playlist or create a new one
-                </p>
+                  }}
+                  onReorderSongs={(reorderedSongs, dragResult) => {
+                    reorderSongs(reorderedSongs);
+                    if (currentSong) {
+                      const newIndex = reorderedSongs.findIndex((song) => song.id === currentSong.id);
+                      if (newIndex !== -1) setCurrentSongIndex(newIndex);
+                    }
+                  }}
+                  onSongClick={handleSetCurrentSong}
+                  currentSong={currentSong}
+                />
+              </>
+            ) : (
+              <div className={`flex-1 flex items-center justify-center ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                <div className="text-center">
+                  <h2 className={`text-2xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    No playlist selected
+                  </h2>
+                  <p className={`text-gray-400 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Select a playlist or create a new one
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
-          <audio ref={playerRef} onEnded={handleNextSong} />
+            )}
+            <audio ref={playerRef} onEnded={handleNextSong} />
+          </div>
+          {currentSong && <Comments song={currentSong} />}
         </div>
       </div>
     </motion.div>

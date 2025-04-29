@@ -55,7 +55,7 @@ const Playlist = ({ songs, onRemoveSong, onReorderSongs, onSongClick, currentSon
             />
             <div className="flex-1 min-w-0">
               <p
-                className={`text-sm font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
+                className={`text-sm font-medium truncate max-w-[150px] sm:max-w-[200px] ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
                 title={song.title}
               >
                 {song.title}
