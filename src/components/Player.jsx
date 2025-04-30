@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { motion, useDragControls } from 'framer-motion';
 import { ThemeContext } from '../context/ThemeContext';
 
@@ -20,14 +20,47 @@ const Player = ({
   const [isMinimized, setIsMinimized] = useState(false);
   const [volume, setVolume] = useState(1);
   const [playerSize, setPlayerSize] = useState({ width: '100%', height: 'auto' });
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const dragControls = useDragControls();
   const playerContainerRef = useRef(null);
+
+  // Format time as MM:SS
+  const formatTime = (seconds) => {
+    if (isNaN(seconds)) return '0:00';
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  // Update currentTime and duration for local files
+  useEffect(() => {
+    const player = playerRef.current;
+    if (player && currentSong?.platform === 'local') {
+      const updateTime = () => setCurrentTime(player.currentTime);
+      const updateDuration = () => setDuration(player.duration || 0);
+      player.addEventListener('timeupdate', updateTime);
+      player.addEventListener('loadedmetadata', updateDuration);
+      return () => {
+        player.removeEventListener('timeupdate', updateTime);
+        player.removeEventListener('loadedmetadata', updateDuration);
+      };
+    }
+  }, [currentSong, playerRef]);
 
   const handleVolumeChange = (e) => {
     const newVolume = e.target.value;
     setVolume(newVolume);
     if (playerRef.current && currentSong?.platform === 'local') {
       playerRef.current.volume = newVolume;
+    }
+  };
+
+  const handleSeek = (e) => {
+    const newTime = e.target.value;
+    setCurrentTime(newTime);
+    if (playerRef.current && currentSong?.platform === 'local') {
+      playerRef.current.currentTime = newTime;
     }
   };
 
@@ -97,6 +130,26 @@ const Player = ({
                 title={currentSong.title}
               />
             )
+          )}
+          {currentSong?.platform === 'local' && (
+            <div className="flex items-center space-x-2 mt-2">
+              <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+                {formatTime(currentTime)}
+              </span>
+              <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                step="0.1"
+                value={currentTime}
+                onChange={handleSeek}
+                className="flex-1 accent-blue-500"
+                aria-label="Seek position"
+              />
+              <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+                {formatTime(duration)}
+              </span>
+            </div>
           )}
         </div>
       )}

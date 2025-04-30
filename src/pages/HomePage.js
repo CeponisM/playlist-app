@@ -97,7 +97,7 @@ const HomePage = () => {
     if (index >= 0 && index < songs.length) {
       const song = songs[index];
       const urlWithAutoplay = getSongUrlWithAutoplay(song);
-      setCurrentSong({ ...song, url: urlWithAutoplay });
+      setCurrentSong({ ...song, url: urlWithAutoplay }); // Triggers Comments useEffect
       if (playerRef.current && song.platform === 'local') {
         playerRef.current.src = song.url;
         playerRef.current.autoplay = isAutoplay && isPlaying;

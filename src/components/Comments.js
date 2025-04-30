@@ -11,29 +11,25 @@ const Comments = ({ song }) => {
     const fetchComments = async () => {
       let fetchedComments = [];
       if (song?.platform === 'youtube') {
-        // Mock YouTube comments
         fetchedComments = [
           { id: 1, user: 'User1', text: 'Great track!' },
           { id: 2, user: 'User2', text: 'Love this vibe!' },
         ];
       } else if (song?.platform === 'soundcloud') {
-        // Mock SoundCloud comments
         fetchedComments = [
           { id: 3, user: 'DJFan', text: 'Awesome beat!' },
         ];
       } else if (song?.platform === 'spotify' || song?.platform === 'yandex') {
-        // Mock Spotify/Yandex comments
         fetchedComments = [
           { id: 4, user: 'MusicLover', text: 'Nice song!' },
         ];
       } else if (song?.platform === 'local') {
-        // Local comments (in-memory)
         fetchedComments = JSON.parse(localStorage.getItem(`comments_${song.id}`) || '[]');
       }
-      setComments(fetchedComments.sort((a, b) => b.id - a.id)); // Latest first
+      setComments(fetchedComments.sort((a, b) => b.id - a.id));
     };
     fetchComments();
-  }, [song]);
+  }, [song?.id]); // Key on song.id
 
   const handleAddComment = (e) => {
     e.preventDefault();
