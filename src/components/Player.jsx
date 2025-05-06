@@ -209,19 +209,23 @@ const Player = ({
             </span>
           </div>
           <div className="relative group">
-            <button
+
+
+                      <button
               onClick={onPreviousSong}
               className={`p-2 rounded-full ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'} transition`}
               aria-label="Previous song"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 3v18l12-9z" />
+                <path d="M6 3v18l12-9z" transform="rotate(180 12 12)" />
               </svg>
             </button>
             <span className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2">
               Previous
             </span>
           </div>
+
+
           <div className="relative group">
             <button
               onClick={() => onPlayPause(!isPlaying)}
@@ -243,13 +247,13 @@ const Player = ({
             </span>
           </div>
           <div className="relative group">
-            <button
+                        <button
               onClick={onNextSong}
               className={`p-2 rounded-full ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'} transition`}
               aria-label="Next song"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 3v18l12-9z" transform="rotate(180 12 12)" />
+                <path d="M6 3v18l12-9z" />
               </svg>
             </button>
             <span className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2">
