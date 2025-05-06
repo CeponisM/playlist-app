@@ -16,20 +16,16 @@ const Comments = ({ song }) => {
           { id: 2, user: 'User2', text: 'Love this vibe!' },
         ];
       } else if (song?.platform === 'soundcloud') {
-        fetchedComments = [
-          { id: 3, user: 'DJFan', text: 'Awesome beat!' },
-        ];
+        fetchedComments = [{ id: 3, user: 'DJFan', text: 'Awesome beat!' }];
       } else if (song?.platform === 'spotify' || song?.platform === 'yandex') {
-        fetchedComments = [
-          { id: 4, user: 'MusicLover', text: 'Nice song!' },
-        ];
+        fetchedComments = [{ id: 4, user: 'MusicLover', text: 'Nice song!' }];
       } else if (song?.platform === 'local') {
         fetchedComments = JSON.parse(localStorage.getItem(`comments_${song.id}`) || '[]');
       }
       setComments(fetchedComments.sort((a, b) => b.id - a.id));
     };
     fetchComments();
-  }, [song?.id]); // Key on song.id
+  }, [song?.id]);
 
   const handleAddComment = (e) => {
     e.preventDefault();
@@ -45,7 +41,7 @@ const Comments = ({ song }) => {
 
   return (
     <motion.div
-      className={`w-full md:w-80 h-full p-4 overflow-y-auto ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} shadow-md`}
+      className={`h-full p-4 overflow-y-auto ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} shadow-md`}
       initial={{ x: 100 }}
       animate={{ x: 0 }}
       transition={{ duration: 0.3 }}
@@ -74,7 +70,9 @@ const Comments = ({ song }) => {
             <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
               {comment.user}
             </p>
-            <p className={`text-sm ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{comment.text}</p>
+            <p className={`text-sm ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              {comment.text}
+            </p>
           </div>
         ))}
       </div>

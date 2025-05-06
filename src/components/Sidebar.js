@@ -1,4 +1,3 @@
-// src/components/Sidebar.js
 import React, { useState, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
