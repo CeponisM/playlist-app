@@ -40,6 +40,15 @@ A modern, web-based music player built with React, supporting playback of local 
 - Modern browser: Chrome, Firefox, Edge, Safari
 - Internet connection (for streaming content)
 
+### Router Base Path Setup
+
+This project is configured to run under the `/15` base path both in the React Router and the build output:
+
+- The `"homepage": "/15"` field in `package.json` ensures that the production build assets are served correctly from the `/15` subdirectory.
+- The React Router is wrapped with `<Router basename="/15">` so that all routes work relative to this base path.
+
+This setup is useful when the app is deployed in a subfolder instead of the root domain.
+
 ### Installation
 
 Clone the repository:
